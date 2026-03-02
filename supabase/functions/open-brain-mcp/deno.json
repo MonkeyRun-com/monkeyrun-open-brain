@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "@modelcontextprotocol/sdk/server/mcp.js": "npm:@modelcontextprotocol/sdk@1.25.3/server/mcp.js",
+    "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js": "npm:@modelcontextprotocol/sdk@1.25.3/server/webStandardStreamableHttp.js",
+    "hono": "npm:hono@^4.9.7",
+    "zod": "npm:zod@^4.1.13",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.47.10"
+  }
+}
