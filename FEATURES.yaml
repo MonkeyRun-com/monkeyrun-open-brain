@@ -1,0 +1,45 @@
+# Open Brain — Feature Tracker
+project: open-brain
+stage: pre-seed
+updated: 2026-03-02
+
+features:
+  - name: Thought Capture (Discord)
+    status: shipped
+    owner: dr-brian
+    description: Discord #capture channel → ingest-thought Edge Function → Postgres + pgvector
+
+  - name: MCP Server (Retrieval)
+    status: shipped
+    owner: dr-brian
+    description: 4 tools — save_thought, search_thoughts, recent_thoughts, brain_stats
+
+  - name: Metadata Extraction
+    status: shipped
+    owner: dr-brian
+    description: Auto-extract type, topics, people, sentiment, action_items via gpt-4o-mini
+
+  - name: Memory Migration Prompt
+    status: planned
+    owner: dr-brian
+    description: Bulk import existing knowledge from Claude conversations into Open Brain
+
+  - name: Weekly Review
+    status: planned
+    owner: dr-brian
+    description: Friday review prompt to surface patterns, forgotten threads, stale thoughts
+
+  - name: Memory Consolidation
+    status: idea
+    owner: dr-brian
+    description: Merge related thoughts, build higher-order summaries, forgetting curves
+
+  - name: Cross-Project Knowledge Graph
+    status: idea
+    owner: dr-brian
+    description: Link thoughts to MonkeyRun projects, people, decisions for structured retrieval
+
+  - name: Claude Desktop OAuth Connector
+    status: blocked
+    owner: dr-brian
+    description: Claude Desktop requires OAuth for remote MCP — need to implement OAuth flow or wait for header support
