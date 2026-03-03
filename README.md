@@ -2,6 +2,14 @@
 
 Personal knowledge/memory layer for MonkeyRun — an MCP server that lets AI agents save, search, and retrieve "thoughts" using semantic vector search.
 
+## Guides & Extensions
+
+| Guide | Description |
+|-------|-------------|
+| [Email Capture — Visual Overview](https://monkeyrun-com.github.io/monkeyrun-open-brain/email-capture-guide.html) | Add Gmail to your persistent memory — pull-based ingestion, RAG chunking, the five things that broke |
+| [Email Capture — Full Guide](docs/EMAIL_CAPTURE_GUIDE.md) | Step-by-step setup, troubleshooting, automation, and security notes |
+| [Substack Post Draft](docs/SUBSTACK_POST_DRAFT.md) | Community contribution post for Nate B. Jones's Open Brain series |
+
 ## Architecture
 
 - **Database:** Supabase PostgreSQL + pgvector (1536-dimension embeddings)
