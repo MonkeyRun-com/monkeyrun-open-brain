@@ -88,10 +88,11 @@ server.registerTool(
   async ({ query, limit, threshold }) => {
     try {
       const qEmb = await getEmbedding(query);
+      // Fetch extra results to account for chunk deduplication
       const { data, error } = await supabase.rpc("match_thoughts", {
         query_embedding: qEmb,
         match_threshold: threshold,
-        match_count: limit,
+        match_count: limit * 3,
         filter: {},
       });
 
@@ -108,13 +109,37 @@ server.registerTool(
         };
       }
 
-      const results = data.map(
+      // Deduplicate chunks from the same parent document
+      const seenParents = new Set<string>();
+      const dedupedResults: typeof data = [];
+
+      for (const t of data) {
+        if (t.parent_id) {
+          if (seenParents.has(t.parent_id)) continue;
+          seenParents.add(t.parent_id);
+        }
+        dedupedResults.push(t);
+        if (dedupedResults.length >= limit) break;
+      }
+
+      // Count how many sibling chunks matched per parent
+      const parentChunkCounts: Record<string, number> = {};
+      for (const t of data) {
+        if (t.parent_id) {
+          parentChunkCounts[t.parent_id] = (parentChunkCounts[t.parent_id] || 0) + 1;
+        }
+      }
+
+      const results = dedupedResults.map(
         (
           t: {
+            id: string;
             content: string;
             metadata: Record<string, unknown>;
             similarity: number;
             created_at: string;
+            parent_id: string | null;
+            chunk_index: number | null;
           },
           i: number
         ) => {
@@ -124,6 +149,9 @@ server.registerTool(
             `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
             `Type: ${m.type || "unknown"}`,
           ];
+          if (t.parent_id && parentChunkCounts[t.parent_id] > 1) {
+            parts.push(`Note: ${parentChunkCounts[t.parent_id]} sections of this document matched`);
+          }
           if (Array.isArray(m.topics) && m.topics.length)
             parts.push(`Topics: ${(m.topics as string[]).join(", ")}`);
           if (Array.isArray(m.people) && m.people.length)
@@ -139,7 +167,7 @@ server.registerTool(
         content: [
           {
             type: "text" as const,
-            text: `Found ${data.length} thought(s):\n\n${results.join("\n\n")}`,
+            text: `Found ${dedupedResults.length} thought(s):\n\n${results.join("\n\n")}`,
           },
         ],
       };

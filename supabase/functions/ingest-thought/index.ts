@@ -80,7 +80,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { content, source } = await req.json();
+    const { content, source, parent_id, chunk_index } = await req.json();
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return new Response(JSON.stringify({ error: "content is required" }), { status: 400 });
@@ -93,25 +93,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const enrichedMetadata = { ...metadata, source: source || "discord" };
 
-    const { data, error } = await supabase
-      .from("thoughts")
-      .insert({
-        content: content.trim(),
-        embedding,
-        metadata: enrichedMetadata,
-      })
-      .select("id, metadata, created_at")
-      .single();
+    const { data, error } = await supabase.rpc("insert_thought", {
+      p_content: content.trim(),
+      p_embedding: embedding,
+      p_metadata: enrichedMetadata,
+      p_parent_id: parent_id || null,
+      p_chunk_index: chunk_index ?? null,
+    });
 
     if (error) {
       console.error("Supabase insert error:", error);
-      return new Response(JSON.stringify({ error: "Failed to store thought" }), { status: 500 });
+      return new Response(JSON.stringify({ error: `Failed to store thought: ${error.message}` }), { status: 500 });
     }
+
+    const thoughtId = data;
 
     return new Response(
       JSON.stringify({
         ok: true,
-        id: data.id,
+        id: thoughtId,
         type: enrichedMetadata.type,
         topics: enrichedMetadata.topics || [],
         people: enrichedMetadata.people || [],

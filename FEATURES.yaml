@@ -19,6 +19,11 @@ features:
     owner: dr-brian
     description: Auto-extract type, topics, people, sentiment, action_items via gpt-4o-mini
 
+  - name: Email Capture (Gmail)
+    status: in-progress
+    owner: dr-brian
+    description: Pull-based Gmail ingestion with OAuth, chunking, dedup. Local script proven (24h + 7d). Next — scale tests, schema changes (parent_id/chunk_index), MCP tools, Nate deliverable.
+
   - name: Memory Migration Prompt
     status: planned
     owner: dr-brian

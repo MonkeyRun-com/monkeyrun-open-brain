@@ -9,6 +9,8 @@
 | content | text | Raw thought text |
 | embedding | vector(1536) | text-embedding-3-small |
 | metadata | jsonb | LLM-extracted (type, topics, people, sentiment, action_items, dates_mentioned, source) |
+| parent_id | uuid (FK -> thoughts.id, nullable) | Self-referential FK. Links chunks to their parent document. CASCADE on delete. |
+| chunk_index | integer (nullable) | Ordering of chunk within parent (0-based) |
 | created_at | timestamptz | Default now() |
 | updated_at | timestamptz | Default now(), auto-updated via trigger |
 
@@ -16,6 +18,7 @@
 - HNSW on `embedding` column using `vector_cosine_ops`
 - GIN on `metadata` for JSONB containment queries
 - B-tree on `created_at DESC` for chronological queries
+- B-tree on `parent_id` (partial, WHERE parent_id IS NOT NULL) for chunk lookups
 - ⚠️ **Do NOT use IVFFlat** — it requires a large dataset to build good clusters and returns 0 results on small datasets
 
 ### RLS
@@ -32,6 +35,14 @@ match_thoughts(
 ```
 Returns matching thoughts by cosine similarity (1 - distance).
 Supports JSONB containment filtering via `metadata @> filter`.
+Now also returns `parent_id` and `chunk_index` for chunk-aware retrieval.
+
+### Chunking Model
+- Long content (500+ words) is stored as a parent document + individual chunks
+- Parent: full text with its own embedding, `parent_id = NULL`
+- Chunks: 200-500 word segments with 50-word overlap, `parent_id` pointing to parent, `chunk_index` for ordering
+- `search_thoughts` MCP tool deduplicates: if multiple chunks from the same parent match, only the best-matching chunk is returned with a note about how many sections matched
+- `ingest-thought` accepts optional `parent_id` and `chunk_index` fields
 
 ## Edge Functions
 
@@ -44,10 +55,11 @@ Supports JSONB containment filtering via `metadata @> filter`.
 - Metadata extraction uses `response_format: { type: "json_object" }` for reliable JSON
 
 ### `ingest-thought` (Capture Endpoint)
-- Simple POST endpoint for Discord capture channel
+- POST endpoint for Discord capture channel and Gmail pull script
 - Auth: x-ingest-key header vs INGEST_KEY env
 - Generates embedding + extracts metadata in parallel
 - Uses `response_format: { type: "json_object" }` for reliable JSON
+- Accepts optional `parent_id` and `chunk_index` for linked chunks
 - Returns: id, type, topics, people, action_items
 
 ## Known Issues & Fixes (DON'T RE-INTRODUCE)
