@@ -1,15 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const INGEST_KEY = Deno.env.get("INGEST_KEY") || "";
 
+const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 async function generateEmbedding(text: string): Promise<number[]> {
-  const res = await fetch("https://openrouter.ai/api/v1/embeddings", {
+  const res = await fetch(`${OPENROUTER_BASE}/embeddings`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${OPENROUTER_API_KEY}`,
@@ -25,7 +25,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 async function extractMetadata(text: string): Promise<Record<string, unknown>> {
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${OPENROUTER_API_KEY}`,
@@ -33,16 +33,18 @@ async function extractMetadata(text: string): Promise<Record<string, unknown>> {
     },
     body: JSON.stringify({
       model: "openai/gpt-4o-mini",
+      response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
-          content: `Extract metadata from the following thought/note. Return valid JSON only with these fields:
-- "type": one of "decision", "person_note", "insight", "meeting", "idea", "task", "reference", "observation"
-- "topics": array of 1-5 topic keywords
+          content: `Extract metadata from the user's captured thought. Return JSON with:
 - "people": array of people mentioned (empty if none)
-- "action_items": array of action items (empty if none)
+- "action_items": array of implied to-dos (empty if none)
+- "dates_mentioned": array of dates YYYY-MM-DD (empty if none)
+- "topics": array of 1-3 short topic tags (always at least one)
+- "type": one of "observation", "task", "idea", "reference", "person_note"
 - "sentiment": one of "positive", "negative", "neutral", "mixed"
-Return ONLY valid JSON, no markdown, no explanation.`,
+Only extract what's explicitly there.`,
         },
         { role: "user", content: text },
       ],
@@ -53,11 +55,11 @@ Return ONLY valid JSON, no markdown, no explanation.`,
   try {
     return JSON.parse(data.choices[0].message.content);
   } catch {
-    return { type: "observation", topics: [], people: [], action_items: [] };
+    return { type: "observation", topics: ["uncategorized"], people: [], action_items: [] };
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
@@ -72,7 +74,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  // Auth check
   const key = req.headers.get("x-ingest-key") || "";
   if (INGEST_KEY && key !== INGEST_KEY) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
@@ -85,16 +86,13 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "content is required" }), { status: 400 });
     }
 
-    // Generate embedding and extract metadata in parallel
     const [embedding, metadata] = await Promise.all([
       generateEmbedding(content),
       extractMetadata(content),
     ]);
 
-    // Add source to metadata
     const enrichedMetadata = { ...metadata, source: source || "discord" };
 
-    // Store in Supabase
     const { data, error } = await supabase
       .from("thoughts")
       .insert({

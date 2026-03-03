@@ -12,7 +12,7 @@ features:
   - name: MCP Server (Retrieval)
     status: shipped
     owner: dr-brian
-    description: 4 tools — save_thought, search_thoughts, recent_thoughts, brain_stats
+    description: 4 tools — capture_thought, search_thoughts, list_thoughts, thought_stats
 
   - name: Metadata Extraction
     status: shipped
@@ -39,7 +39,7 @@ features:
     owner: dr-brian
     description: Link thoughts to MonkeyRun projects, people, decisions for structured retrieval
 
-  - name: Claude Desktop OAuth Connector
-    status: blocked
+  - name: Claude Desktop Connector
+    status: shipped
     owner: dr-brian
-    description: Claude Desktop requires OAuth for remote MCP — need to implement OAuth flow or wait for header support
+    description: Claude Desktop supports remote MCP via Settings → Connectors with ?key= URL (no OAuth needed)

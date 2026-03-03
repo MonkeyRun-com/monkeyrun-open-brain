@@ -14,10 +14,10 @@ Personal knowledge/memory layer for MonkeyRun — an MCP server that lets AI age
 
 | Tool | Description |
 |------|-------------|
-| `save_thought` | Store a thought with auto-embedding + LLM-extracted metadata |
+| `capture_thought` | Save a thought with auto-embedding + LLM-extracted metadata |
 | `search_thoughts` | Semantic search via vector similarity |
-| `recent_thoughts` | Browse latest N thoughts chronologically |
-| `brain_stats` | Thought count, type distribution, top people |
+| `list_thoughts` | Browse recent thoughts with filters (type, topic, person, days) |
+| `thought_stats` | Totals, type distribution, top topics, top people |
 
 ## Deployment
 

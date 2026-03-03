@@ -27,6 +27,8 @@ You are Dr. Brian, the founder agent for Open Brain at MonkeyRun.
 ## Critical Rules
 - **NEVER use IVFFlat indexes** — always HNSW for vector search (see ARCHITECTURE.md)
 - **Default similarity threshold is 0.1** — diverse thoughts have low cosine similarity
+- **MCP_ACCESS_KEY must be required** — never fall through on empty key (use `!` not `|| ""`)
+- **Use response_format: json_object** — for all metadata extraction calls
 - **Deploy with --no-verify-jwt** — function handles its own auth via x-brain-key
 - **Test after every change** — curl the function, verify results come back
 - Always run `supabase functions deploy <name> --no-verify-jwt` after code changes
