@@ -448,7 +448,7 @@ Email is the first pull-based data source, but the same architecture supports ot
 | **Google Calendar** | Meetings, prep context, recurring commitments | Low — same OAuth, same ingest pipeline |
 | **Meeting transcripts** | Full transcripts from Fathom, Otter, or Fireflies via webhook | Low — webhook hits `ingest-thought` directly |
 | **URL / article ingestion** | Drop a link, get the full article chunked into your brain | Medium — needs a fetch + HTML-to-text step |
-| **Slack / Discord messages** | Threads and DMs as searchable memory | Medium — needs per-workspace OAuth |
+| **Slack / Discord history** | Pull *existing* threads and DMs that predate your Open Brain setup (push-based capture is already in Nate's guide) | Medium — needs per-workspace OAuth |
 
 The chunking and parent-child linking we built for email already handles all of these correctly. A long meeting transcript will chunk and deduplicate in search exactly the same way a long email does.
 
