@@ -1,6 +1,6 @@
 # Open Brain 🧠
 
-> **Built on [Nate B. Jones's Open Brain](https://www.youtube.com/@natebjonestech) architecture.** This is MonkeyRun's implementation and extension of his open-source personal memory system — we've added Gmail capture, RAG chunking for long-form content, and documented the journey of building it with AI.
+> **Built on [Nate B. Jones's Open Brain](https://www.natebjones.com) architecture.** This is MonkeyRun's implementation and extension of his open-source personal memory system — we've added Gmail capture, RAG chunking for long-form content, and documented the journey of building it with AI.
 
 **[MonkeyRun](https://monkeyrun.com)** is a software studio that builds and ships products using AI as the primary development partner — using tools like Cursor, Claude, and OpenClaw to manage real projects end-to-end. This repo is one of those experiments: building a persistent AI memory layer and learning in public.
 
