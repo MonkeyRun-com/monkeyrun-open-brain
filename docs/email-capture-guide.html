@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Open Brain: Email Capture — Adding Gmail to Your Persistent Memory</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-2: #222535;
+      --border: #2e3148;
+      --text: #e2e4f0;
+      --text-muted: #7b8099;
+      --accent: #7c6af7;
+      --accent-light: #a89cf9;
+      --accent-bg: #1e1b3a;
+      --green: #34d399;
+      --green-bg: #0d2b20;
+      --amber: #fbbf24;
+      --amber-bg: #2b1f0a;
+      --red: #f87171;
+      --red-bg: #2b0f0f;
+      --code-bg: #151720;
+      --radius: 8px;
+      --max-width: 760px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 17px;
+      line-height: 1.75;
+      padding: 0 1rem 6rem;
+    }
+
+    /* ── Header ── */
+    .hero {
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 4rem 0 3rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .hero-eyebrow {
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--accent-light);
+      margin-bottom: .75rem;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -.02em;
+      margin-bottom: .75rem;
+    }
+    .hero h1 span { color: var(--accent-light); }
+    .hero-sub {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 580px;
+    }
+
+    /* ── Stats strip ── */
+    .stats {
+      max-width: var(--max-width);
+      margin: 2.5rem auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .stat {
+      background: var(--surface);
+      padding: 1.25rem 1rem;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--accent-light);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: .35rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    /* ── Nav pill ── */
+    .toc {
+      max-width: var(--max-width);
+      margin: 0 auto 3rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .toc a {
+      display: inline-block;
+      padding: .35rem .9rem;
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: all .15s;
+    }
+    .toc a:hover {
+      border-color: var(--accent);
+      color: var(--accent-light);
+      background: var(--accent-bg);
+    }
+
+    /* ── Main content ── */
+    .content {
+      max-width: var(--max-width);
+      margin: 0 auto;
+    }
+
+    /* ── Part headers ── */
+    .part-header {
+      margin: 4rem 0 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .part-tag {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--accent);
+      margin-bottom: .4rem;
+    }
+    .part-header h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+
+    h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin: 2.5rem 0 .75rem;
+      letter-spacing: -.01em;
+    }
+
+    p { margin-bottom: 1rem; }
+
+    a { color: var(--accent-light); text-decoration: underline; text-underline-offset: 3px; }
+
+    /* ── Callout boxes ── */
+    .callout {
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin: 1.75rem 0;
+      border-left: 3px solid;
+    }
+    .callout-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-bottom: .5rem;
+    }
+    .callout.info   { background: var(--accent-bg); border-color: var(--accent); }
+    .callout.info .callout-title { color: var(--accent-light); }
+    .callout.success { background: var(--green-bg); border-color: var(--green); }
+    .callout.success .callout-title { color: var(--green); }
+    .callout.warning { background: var(--amber-bg); border-color: var(--amber); }
+    .callout.warning .callout-title { color: var(--amber); }
+    .callout.danger  { background: var(--red-bg); border-color: var(--red); }
+    .callout.danger .callout-title { color: var(--red); }
+
+    /* ── Failure cards ── */
+    .failures { display: grid; gap: 1rem; margin: 1.75rem 0; }
+    .failure-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+    }
+    .failure-card .number {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--accent);
+      margin-bottom: .35rem;
+    }
+    .failure-card h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: .5rem;
+    }
+    .failure-card p { margin: 0; font-size: .95rem; color: var(--text-muted); }
+    .failure-card .fix {
+      margin-top: .75rem;
+      font-size: .875rem;
+      color: var(--green);
+    }
+    .failure-card .fix strong { color: var(--green); }
+
+    /* ── Code ── */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      margin: 1.25rem 0;
+      font-size: .875rem;
+      line-height: 1.6;
+    }
+    code {
+      font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+      font-size: .875em;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: .15em .4em;
+      border-radius: 4px;
+    }
+    pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+    /* SQL keyword highlight */
+    .kw { color: #7c6af7; }
+    .cm { color: #4b5280; font-style: italic; }
+    .str { color: #34d399; }
+
+    /* ── Steps ── */
+    .steps { counter-reset: step; list-style: none; margin: 1.25rem 0; }
+    .steps li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 2.5rem 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      align-items: start;
+    }
+    .steps li::before {
+      content: counter(step);
+      width: 2rem;
+      height: 2rem;
+      border-radius: 50%;
+      background: var(--accent-bg);
+      border: 1px solid var(--accent);
+      color: var(--accent-light);
+      font-size: .8rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: .2rem;
+    }
+    .steps li strong { display: block; margin-bottom: .25rem; }
+    .steps li p { margin: 0; color: var(--text-muted); font-size: .95rem; }
+
+    /* ── Tables ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: .9rem;
+    }
+    th {
+      text-align: left;
+      padding: .6rem 1rem;
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--text-muted);
+    }
+    td {
+      padding: .75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface); }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: .2em .6em;
+      border-radius: 99px;
+      font-weight: 600;
+    }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); }
+
+    /* ── Blockquote ── */
+    blockquote {
+      border-left: 3px solid var(--accent);
+      padding: .75rem 1.25rem;
+      color: var(--text-muted);
+      font-style: italic;
+      margin: 1.5rem 0;
+      background: var(--accent-bg);
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    em { font-style: italic; }
+    strong { font-weight: 600; color: #f0f2ff; }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 3rem 0;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      max-width: var(--max-width);
+      margin: 4rem auto 0;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: .9rem;
+    }
+    .footer a { color: var(--accent-light); }
+
+    @media (max-width: 600px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      body { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════ HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">An extension to Nate B. Jones's Open Brain setup guide</div>
+  <h1>Open Brain:<br><span>Email Capture</span></h1>
+  <p class="hero-sub">Adding Gmail to your persistent memory — pull-based ingestion, RAG chunking, and the five things that broke on the way.</p>
+</div>
+
+<!-- stats -->
+<div class="stats">
+  <div class="stat"><div class="stat-value">153</div><div class="stat-label">Thoughts ingested</div></div>
+  <div class="stat"><div class="stat-value">30d</div><div class="stat-label">Email history</div></div>
+  <div class="stat"><div class="stat-value">$0.02</div><div class="stat-label">Total API cost</div></div>
+  <div class="stat"><div class="stat-value">8 min</div><div class="stat-label">Processing time</div></div>
+</div>
+
+<!-- nav -->
+<nav class="toc">
+  <a href="#why">Why email?</a>
+  <a href="#whats-different">What's different</a>
+  <a href="#story">The story</a>
+  <a href="#guide">Setup guide</a>
+  <a href="#changed">What changed</a>
+  <a href="#automation">Automation</a>
+  <a href="#security">Security</a>
+  <a href="#reference">Reference</a>
+</nav>
+
+<div class="content">
+
+<!-- ══════════════════════════════════════════════ PART 1 -->
+<div class="part-header" id="why">
+  <div class="part-tag">Part 1 — The Story</div>
+  <h2>Why Email?</h2>
+</div>
+
+<p>Nate's guide cracked the daily capture habit. You type a thought into Slack, it gets embedded and classified in five seconds, and any AI you use can search it by meaning. That's genuinely transformative — but it captures what you <em>decide to capture</em>.</p>
+
+<p>Your email is different. It's thinking you already did. Every email you write is a decision, a position, a relationship update, or a problem you solved. You wrote it, you sent it, and it immediately became invisible to your AI tools.</p>
+
+<p>When we looked at 30 days of sent mail — project updates, client advice, personal advocacy, community work — it was 153 distinct thoughts that an AI couldn't access until now. Long emails explaining complex situations. Narrative summaries of ongoing projects. Strategic advice to colleagues. All of it, in your voice, about the things that actually matter to you.</p>
+
+<div class="callout info" id="whats-different">
+  <div class="callout-title">What's different about this extension</div>
+  <p><strong>Pull-based, not push-based.</strong> Nate's setup is push-based: you decide what to capture and push it in. This adds a parallel track that reaches out to where your thinking already lives and brings it in on your schedule.</p>
+  <p style="margin-top:.75rem"><strong>RAG chunking for long documents.</strong> Embedding a 1,500-word email as a single vector produces a blurry average of a dozen topics. The fix: split it into 300-word segments, each embedded separately. When you search, you get the relevant <em>section</em>, not a low-confidence match on the whole thing.</p>
+  <p style="margin-top:.75rem"><strong>More infrastructure.</strong> Google Cloud OAuth, schema migrations, updated Edge Functions. Budget an hour, not ten minutes. Every failure mode is documented below.</p>
+</div>
+
+<h3 id="story">How We Built It</h3>
+
+<p>This pipeline was built in a single session with Dr. Brian — an AI agent running in Cursor. We're sharing the story because the hard parts weren't where we expected them.</p>
+
+<p><strong>What we thought would be hard:</strong> Gmail OAuth. Getting permission to read someone's email requires Google Cloud Console setup, consent screens, scopes, token refresh. It's genuinely involved.</p>
+
+<p><strong>What was actually hard:</strong></p>
+
+<div class="failures">
+
+  <div class="failure-card">
+    <div class="number">Failure 01</div>
+    <h4>Gmail's line-wrapping breaks quote detection</h4>
+    <p>When you reply to an email, Gmail wraps "On Mon, Mar 2 at 8:56 AM Someone wrote:" across 2–3 lines in plain text. Our first stripper only matched it on one line. One reply showed 703 words when the actual reply was "hello."</p>
+    <div class="fix">Fix: look ahead across multiple lines to detect the split pattern.</div>
+  </div>
+
+  <div class="failure-card">
+    <div class="number">Failure 02</div>
+    <h4>Supabase's PostgREST cache doesn't update instantly</h4>
+    <p>We added <code>parent_id</code> and <code>chunk_index</code> columns. The SQL ran fine. The REST API that Edge Functions use to talk to Postgres didn't see the new columns — at all — for hours. Tried four ways to reload the schema cache. None worked reliably.</p>
+    <div class="fix">Fix: create an RPC function that writes via PL/pgSQL, bypassing the REST layer entirely.</div>
+  </div>
+
+  <div class="failure-card">
+    <div class="number">Failure 03</div>
+    <h4>A travel booking confirmation produced 23 chunks of CSS</h4>
+    <p>The Gmail API returns HTML. Our HTML-to-text conversion preserved too much structure. One booking confirmation was 8,874 words of boilerplate, chunked into 23 meaningless fragments.</p>
+    <div class="fix">Fix: detect CSS density (more than 10 <code>{...}</code> blocks) and skip, plus filter sender/subject patterns for transactional email.</div>
+  </div>
+
+  <div class="failure-card">
+    <div class="number">Failure 04</div>
+    <h4>The Gmail label API is AND, not OR</h4>
+    <p>Passing <code>SENT</code> and <code>STARRED</code> together returns messages that have <em>both</em> labels. We needed either. This is the opposite of what most people expect.</p>
+    <div class="fix">Fix: query each label independently and deduplicate by message ID before processing.</div>
+  </div>
+
+  <div class="failure-card">
+    <div class="number">Failure 05</div>
+    <h4>A 1,900-word email wouldn't chunk</h4>
+    <p>Our chunking logic uses paragraph breaks as split points. One email had no double-newline breaks — just a wall of text. Paragraph-first splitting produced a single oversized chunk and stopped.</p>
+    <div class="fix">Fix: detect when paragraph splitting produces only one segment, fall back to sentence-boundary splitting.</div>
+  </div>
+
+</div>
+
+<div class="callout success">
+  <div class="callout-title">The number that matters</div>
+  30 days of email, SENT + STARRED labels. 170 messages fetched. 47 filtered as noise. 123 processed. <strong>153 thoughts ingested</strong>, including 13 emails chunked into smaller segments with parent-child linking. Total API cost: <strong>$0.02</strong>. Total time: <strong>8 minutes</strong>.
+</div>
+
+<!-- ══════════════════════════════════════════════ PART 2 -->
+<div class="part-header" id="guide">
+  <div class="part-tag">Part 2 — The Guide</div>
+  <h2>Step-by-Step Setup</h2>
+</div>
+
+<div class="callout info">
+  <div class="callout-title">Before you start</div>
+  You need Open Brain already running from Nate's guide. You also need <a href="https://deno.com" target="_blank">Deno</a> installed (<code>brew install deno</code> on Mac) and a Google account with Gmail. Budget about an hour.
+</div>
+
+<h3>Credential Tracker</h3>
+<p>You'll generate one new set of credentials. Add these to your tracker alongside the ones from Nate's guide:</p>
+<pre>GMAIL (Step 2)
+  Google Cloud Project:   ____________
+  OAuth Client ID:        ____________
+  OAuth Client Secret:    ____________
+  credentials.json saved: yes / no</pre>
+
+<ol class="steps">
+  <li>
+    <div>
+      <strong>Get the code</strong>
+      <p>Clone the repo or pull the latest if you already have it.</p>
+      <pre>git clone https://github.com/MonkeyRun-com/monkeyrun-open-brain.git
+cd monkeyrun-open-brain
+# or if you already have it:
+git pull</pre>
+    </div>
+  </li>
+
+  <li>
+    <div>
+      <strong>Create Google Cloud OAuth credentials</strong>
+      <p>Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> → New Project → "Open Brain". Enable the Gmail API. Configure the OAuth consent screen (External, add your Gmail as a test user, add the <code>gmail.readonly</code> scope). Create an OAuth Client ID (Desktop app type). Download the JSON and save it as <code>scripts/credentials.json</code>.</p>
+    </div>
+  </li>
+
+  <li>
+    <div>
+      <strong>Run the database migration</strong>
+      <p>In the Supabase dashboard → SQL Editor, paste and run:</p>
+      <pre><span class="cm">-- Add chunking support</span>
+<span class="kw">ALTER TABLE</span> thoughts
+  <span class="kw">ADD COLUMN IF NOT EXISTS</span> parent_id uuid <span class="kw">REFERENCES</span> thoughts(id) <span class="kw">ON DELETE CASCADE</span>,
+  <span class="kw">ADD COLUMN IF NOT EXISTS</span> chunk_index integer;
+
+<span class="kw">CREATE INDEX IF NOT EXISTS</span> thoughts_parent_id <span class="kw">ON</span> thoughts (parent_id)
+  <span class="kw">WHERE</span> parent_id <span class="kw">IS NOT NULL</span>;
+
+<span class="cm">-- RPC to bypass PostgREST schema cache</span>
+<span class="kw">CREATE OR REPLACE FUNCTION</span> insert_thought(
+  p_content text, p_embedding vector(1536),
+  p_metadata jsonb, p_parent_id uuid <span class="kw">DEFAULT NULL</span>,
+  p_chunk_index integer <span class="kw">DEFAULT NULL</span>
+) <span class="kw">RETURNS</span> uuid <span class="kw">LANGUAGE</span> plpgsql <span class="kw">AS</span> $$
+<span class="kw">DECLARE</span> new_id uuid;
+<span class="kw">BEGIN</span>
+  <span class="kw">INSERT INTO</span> thoughts (content, embedding, metadata, parent_id, chunk_index)
+  <span class="kw">VALUES</span> (p_content, p_embedding, p_metadata, p_parent_id, p_chunk_index)
+  <span class="kw">RETURNING</span> id <span class="kw">INTO</span> new_id;
+  <span class="kw">RETURN</span> new_id;
+<span class="kw">END</span>; $$;</pre>
+    </div>
+  </li>
+
+  <li>
+    <div>
+      <strong>Deploy the updated Edge Functions</strong>
+      <pre>supabase functions deploy ingest-thought --no-verify-jwt
+supabase functions deploy open-brain-mcp --no-verify-jwt</pre>
+    </div>
+  </li>
+
+  <li>
+    <div>
+      <strong>Set your environment variables</strong>
+      <pre>export INGEST_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/ingest-thought"
+export INGEST_KEY="your-ingest-key"</pre>
+      <p>Add to <code>~/.zshrc</code> to make them permanent.</p>
+    </div>
+  </li>
+
+  <li>
+    <div>
+      <strong>First dry run</strong>
+      <pre>deno run --allow-net --allow-read --allow-write --allow-env \
+  scripts/pull-gmail.ts --dry-run --window=24h</pre>
+      <p>Authorize via the URL it prints. Check the output — are long emails showing <code>[N chunks]</code>? Is the content preview clean? When it looks right, drop <code>--dry-run</code> to go live.</p>
+    </div>
+  </li>
+
+  <li>
+    <div>
+      <strong>Scale up</strong>
+      <pre>deno run --allow-net --allow-read --allow-write --allow-env \
+  scripts/pull-gmail.ts --window=30d --labels=SENT,STARRED</pre>
+      <p>Re-running is safe — the sync log tracks ingested IDs and skips duplicates.</p>
+    </div>
+  </li>
+</ol>
+
+<h3>Label Strategy</h3>
+<table>
+  <thead>
+    <tr><th>Label</th><th>What it contains</th><th>Recommendation</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>SENT</code></td><td>Everything you sent</td><td><span class="badge badge-green">Always include</span></td></tr>
+    <tr><td><code>STARRED</code></td><td>Emails you explicitly starred</td><td><span class="badge badge-green">Good addition</span></td></tr>
+    <tr><td><code>IMPORTANT</code></td><td>Gmail's auto-importance</td><td><span class="badge badge-amber">More noise</span></td></tr>
+    <tr><td><code>INBOX</code></td><td>Everything in inbox</td><td>Skip</td></tr>
+    <tr><td>Custom labels</td><td>Your own organization</td><td><span class="badge badge-green">Gold — add any</span></td></tr>
+  </tbody>
+</table>
+
+<p><strong>Pro tip:</strong> Gmail labels become searchable metadata. The script stores all labels on each ingested thought, so you can later ask your AI "show me everything I tagged as Project X."</p>
+
+<!-- ══════════════════════════════════════════════ PART 3 -->
+<div class="part-header" id="changed">
+  <div class="part-tag">Part 3 — What Changed</div>
+  <h2>For Existing Open Brain Users</h2>
+</div>
+
+<h3>Database Changes</h3>
+<table>
+  <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td><code>parent_id</code></td><td>uuid (nullable FK)</td><td>Links chunks to their parent document</td></tr>
+    <tr><td><code>chunk_index</code></td><td>integer (nullable)</td><td>Orders chunks within a parent (0-based)</td></tr>
+  </tbody>
+</table>
+<p>These are nullable — your existing thoughts are unaffected. The migration uses <code>IF NOT EXISTS</code>, safe to run on a live database.</p>
+
+<h3>Updated Edge Functions</h3>
+<p><strong><code>ingest-thought</code></strong> now accepts <code>parent_id</code>, <code>chunk_index</code>, and <code>extra_metadata</code>. Has 3-attempt retry logic for OpenRouter failures. Caps embedding input at 8,000 characters. Crashes on startup if <code>INGEST_KEY</code> is unset (rather than silently accepting all requests).</p>
+<p><strong><code>open-brain-mcp</code></strong> search now fetches 3× the requested limit and deduplicates chunks from the same parent — if 3 chunks of a long email match your query, you get one result with a note. New tool: <code>email_sync_status</code>.</p>
+
+<h3>New Metadata Fields</h3>
+<pre><span class="str">{
+  "type": "observation",
+  "topics": ["strategy", "product"],
+  "people": ["Alice", "Bob"],
+  "sentiment": "positive",
+  "source": "gmail",
+  "gmail_labels": ["SENT", "IMPORTANT"],
+  "gmail_id": "18e4f2a...",
+  "gmail_thread_id": "18e4f1..."
+}</span></pre>
+
+<h3>What's Next</h3>
+<table>
+  <thead><tr><th>Extension</th><th>What it adds</th><th>Complexity</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Google Calendar</strong></td><td>Meetings, prep context, recurring commitments</td><td><span class="badge badge-green">Low — same OAuth</span></td></tr>
+    <tr><td><strong>Meeting transcripts</strong></td><td>Fathom, Otter, or Fireflies via webhook</td><td><span class="badge badge-green">Low — webhook to ingest-thought</span></td></tr>
+    <tr><td><strong>URL / article ingestion</strong></td><td>Drop a link, get the full article chunked</td><td><span class="badge badge-amber">Medium</span></td></tr>
+    <tr><td><strong>Slack / Discord history</strong></td><td>Pull existing threads that predate your setup (push capture is already Nate's)</td><td><span class="badge badge-amber">Medium</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════════ SECURITY -->
+<div class="part-header" id="security">
+  <div class="part-tag">Security</div>
+  <h2>Prompt Injection Risk</h2>
+</div>
+
+<div class="callout danger">
+  <div class="callout-title">Read this before ingesting INBOX or STARRED</div>
+  <p>When you ingest email content, you're pulling in text written by other people. A crafted email could contain text designed to manipulate your AI when it later retrieves and reasons about that content — "ignore previous instructions," etc. This is prompt injection.</p>
+</div>
+
+<p><strong>The partial protection:</strong> The <code>ingest-thought</code> function sends content to OpenRouter to extract structured JSON metadata — not to reason freely. The structure acts as a summarization barrier. The embedding step is purely mathematical. Neither step is a high-risk surface.</p>
+
+<p><strong>Where the real risk lives:</strong> When you ask your AI to "summarize everything I emailed about Project X" — that's when retrieved email content enters the AI's context window alongside your instructions.</p>
+
+<p><strong>Practical mitigations:</strong></p>
+<ul style="margin: .75rem 0 1rem 1.5rem; color: var(--text-muted);">
+  <li style="margin-bottom:.5rem">Stick to <code>SENT</code> as your primary label — you wrote those emails</li>
+  <li style="margin-bottom:.5rem">Be more cautious with <code>STARRED</code> or <code>INBOX</code> (content from untrusted senders)</li>
+  <li style="margin-bottom:.5rem">The <code>gmail.readonly</code> OAuth scope means the script can never send email on your behalf</li>
+  <li>If an AI client behaves strangely after a memory search, check what was retrieved</li>
+</ul>
+
+<!-- ══════════════════════════════════════════════ AUTOMATION -->
+<div class="part-header" id="automation">
+  <div class="part-tag">Part 4 — Reference</div>
+  <h2>Running This Automatically</h2>
+</div>
+
+<p>Right now the script is manual. Here's where things stand and where they're going.</p>
+
+<h3>Option 1: cron (works today)</h3>
+<pre># Add to crontab: crontab -e
+# Runs every Monday at 8am
+0 8 * * 1 cd /path/to/monkeyrun-open-brain && \
+  INGEST_URL="..." INGEST_KEY="..." \
+  deno run --allow-net --allow-read --allow-write --allow-env \
+  scripts/pull-gmail.ts --window=7d --labels=SENT,STARRED</pre>
+
+<h3>Option 2: OpenClaw (the right long-term home)</h3>
+<p>OpenClaw is built for exactly this — scheduled tasks, local script execution, Telegram notifications when done. If you're already running it, give it this prompt:</p>
+
+<blockquote>
+  "Add a weekly cron job that runs every Monday at 8am. It should cd into my Open Brain project directory and run <code>deno run --allow-net --allow-read --allow-write --allow-env scripts/pull-gmail.ts --window=7d --labels=SENT,STARRED</code>. When it finishes, send me a Telegram message with the summary line from the output."
+</blockquote>
+
+<p>OpenClaw builds the cron job, hooks it into its scheduler, and you get a weekly brain sync with a Telegram confirmation. The Gmail OAuth token lives in the project directory — no extra credential setup needed.</p>
+
+<h3>Option 3: MCP trigger (roadmap)</h3>
+<p>The cleanest eventual solution: a <code>pull_emails</code> MCP tool that lets you trigger a sync from any AI client just by asking for one. Deferred because it requires moving the OAuth token server-side or building a webhook architecture. On the roadmap as the system matures.</p>
+
+<div class="part-header" id="reference">
+  <div class="part-tag">Reference</div>
+  <h2>Script Options &amp; Troubleshooting</h2>
+</div>
+
+<h3>Script Options</h3>
+<table>
+  <thead><tr><th>Flag</th><th>Default</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>--window=</code></td><td>24h</td><td>Time window: 24h, 7d, 30d, 1y, all</td></tr>
+    <tr><td><code>--labels=</code></td><td>SENT</td><td>Comma-separated Gmail labels (OR logic)</td></tr>
+    <tr><td><code>--dry-run</code></td><td>off</td><td>Preview without ingesting</td></tr>
+    <tr><td><code>--limit=</code></td><td>50</td><td>Max emails per run</td></tr>
+    <tr><td><code>--list-labels</code></td><td>off</td><td>Print all Gmail labels and exit</td></tr>
+  </tbody>
+</table>
+
+<h3>Troubleshooting</h3>
+
+<div class="callout warning">
+  <div class="callout-title">"Unauthorized" error</div>
+  Your <code>INGEST_KEY</code> doesn't match the one in Supabase. Check with <code>supabase secrets list</code> and re-export the correct value.
+</div>
+
+<div class="callout warning">
+  <div class="callout-title">"Module not found"</div>
+  Run the script from your project directory: <code>cd /path/to/monkeyrun-open-brain</code> first.
+</div>
+
+<div class="callout warning">
+  <div class="callout-title">"Token refresh failed"</div>
+  Delete <code>scripts/token.json</code> and re-run to re-authorize.
+</div>
+
+<div class="callout warning">
+  <div class="callout-title">"Found 0 messages"</div>
+  Labels are case-sensitive. Run <code>--list-labels</code> to see exactly what your account has.
+</div>
+
+</div><!-- /content -->
+
+<div class="footer">
+  <p>Built on top of <strong>Nate B. Jones's Open Brain architecture</strong> — the database schema, the embedding pipeline, the MCP server pattern, and the philosophy that your AI memory should be infrastructure you own.</p>
+  <p style="margin-top:.75rem">All code at <a href="https://github.com/MonkeyRun-com/monkeyrun-open-brain" target="_blank">github.com/MonkeyRun-com/monkeyrun-open-brain</a> · Full guide at <code>docs/EMAIL_CAPTURE_GUIDE.md</code></p>
+</div>
+
+</body>
+</html>
