@@ -1,41 +1,65 @@
 # COO Status — Open Brain
 
-**Last updated:** 2026-03-04
-**Stage:** Pre-seed (MVP live)
+**Last updated:** 2026-03-03
+**Stage:** Pre-seed (MVP live, community release ready)
 **Owner:** Dr. Brian 🧠
 
 ## Current State
 - MVP deployed and operational on Supabase
-- 4 MCP tools: capture_thought, search_thoughts, list_thoughts, thought_stats
+- 5 MCP tools: capture_thought, search_thoughts, list_thoughts, thought_stats, email_sync_status
 - Discord #capture channel active for thought ingestion
-- Gmail email capture: local pull script (scripts/pull-gmail.ts) — Phase 1 + 2 complete, 153 thoughts ingested (30-day SENT+STARRED)
+- Gmail email capture: local pull script (scripts/pull-gmail.ts) — fully complete, 153 thoughts ingested (30-day SENT+STARRED)
 - Connected clients: Claude Code ✅, Cursor ✅, Claude Desktop ✅, ChatGPT ✅, OpenClaw ✅
+- GitHub repo public and clean — no secrets, no personal info, project ref scrubbed
+- GitHub Pages live: https://monkeyrun-com.github.io/monkeyrun-open-brain/
 
-## Recent Changes (2026-03-04)
-- Phase 1 complete: parent_id/chunk_index schema, insert_thought RPC, search_thoughts chunk dedup
-- Phase 2 complete: Gmail pull script with OAuth, multi-label OR logic, quote stripping (incl. multi-line "On ... wrote:"), transactional noise filters, sentence-boundary chunking fallback, gmail_labels in metadata
-- Security hardened: INGEST_KEY required (no auth bypass), embedding retry (3 attempts), 8k-char cap for embedding API, OpenRouter error handling
-- 30-day scale test: 170 messages, 123 processed, 47 filtered, 153 thoughts ingested, 0 errors (~$0.02, ~8 min)
-- Plan updated: .cursor/plans/open_brain_email_capture_75b0a917.plan.md
+## Session Summary (2026-03-03) — Handoff for Jared
 
-## Active Work — Email Capture
-Spec: .cursor/plans/open_brain_email_capture_75b0a917.plan.md
+This session completed the Nate B. Jones community deliverable and prepared the project for public sharing. Here's everything that shipped:
 
-### Done
-- Phase 1: Core pipeline (schema, chunking, dedup in search)
-- Phase 2: Gmail pull script (OAuth, labels, windows, chunking, dedup, label metadata)
-- Scale test: 30d SENT+STARRED ✅
-- Backlog fixes: Lenny/OpenRouter edge cases, 1925-word unchunked email (sentence fallback), retry + content cap
+### Security & Public Repo Cleanup
+- Scrubbed Supabase project ref from README.md and .cursor/rules/dr-brian-orchestrator.mdc
+- Removed personal name ("Jared") from cursor rule
+- Verified .gitignore covers all credential files (credentials.json, token.json, sync-log.json)
+- Repo is safe to share publicly
 
-### Next
-- Phase 3: Deferred. Decision: keep pulls local (privacy, simplicity); skip MCP tools (pull_emails, email_sync_status) for Nate deliverable.
-- Phase 4: Nate B. Jones deliverable — The Story, The Guide, What Changed, reference code
+### Community Deliverable (docs/)
+- `EMAIL_CAPTURE_GUIDE.md` — full 4-part guide (Story, Setup, What Changed, Reference)
+  - Added "What's Different" section explaining pull vs push and RAG chunking concepts
+  - Added complexity warning (more infra than Nate's original guide)
+  - Added prompt injection security section
+  - Added future extensions roadmap table (Calendar, Transcripts, URL ingestion, Slack history)
+  - Added OpenClaw automation section with copy-paste prompt for weekly sync + Telegram notification
+  - Fixed Slack/Discord row to credit Nate's existing push capture
+- `SUBSTACK_POST_DRAFT.md` — ready-to-submit post for Nate B. Jones's Substack
+- `email-capture-guide.html` — dark-themed styled HTML visual overview with stats, failure cards, step guide
+- `index.html` — GitHub Pages redirect so root URL lands on the guide
+
+### GitHub / Distribution
+- README rewritten: proper attribution to Nate (natebjones.com), MonkeyRun explained, guides table added
+- GitHub Pages enabled: https://monkeyrun-com.github.io/monkeyrun-open-brain/
+- Repo "About" website field: point to GitHub Pages URL (manual step — do in GitHub UI)
+
+### Joan Brief
+- Created `docs/JOAN_BRIEF.md` — brief for Joan to write a MonkeyRun.com blog post about this project
+
+## What's Ready to Hand Off
+- **Nate:** Send him `docs/SUBSTACK_POST_DRAFT.md` + link to the GitHub Pages URL. He can publish as-is or edit.
+- **Joan:** See `docs/JOAN_BRIEF.md` — MonkeyRun.com post brief is ready
+- **Repo:** Public, clean, linked from GitHub Pages. Share freely.
+
+## Next Phase Options (not started)
+- Phase 3 (deferred): `pull_emails` MCP tool — requires server-side OAuth token storage decision
+- Google Calendar ingestion — same OAuth, low effort
+- Meeting transcript ingestion (Fathom webhook)
+- URL/article ingestion tool
 
 ## Blockers
 - None
 
 ## Migration Log
-- 2026-03-02: Migrated from ~/.openclaw/workspace/supabase/ and Halo workspace to dedicated repo
-- 2026-03-02: Full alignment with Nate's updated setup guide (DB + functions + docs)
+- 2026-03-02: Migrated from ~/.openclaw/workspace/supabase/ to dedicated repo
+- 2026-03-02: Full alignment with Nate's updated setup guide
 - 2026-03-03: Email capture pipeline built and validated
-- 2026-03-04: Phase 1+2 complete, security hardened, 30-day run, plan updated
+- 2026-03-04: Phase 1+2 complete, security hardened, 30-day run
+- 2026-03-03: Community deliverable complete, repo public, GitHub Pages live
