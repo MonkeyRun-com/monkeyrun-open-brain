@@ -19,6 +19,23 @@ When we looked at 30 days of sent mail — project updates, client advice, perso
 
 That's what this extension adds.
 
+---
+
+### What's Different About This Extension
+
+Before you dive in, a few things worth knowing about what you're getting into.
+
+**This is a pull-based system — a different architecture than Nate's guide.**
+Nate's setup is push-based: you decide what to capture and manually push it into your brain. That's intentional — low noise, high signal, fully in your control. This extension adds a second mode: pull-based ingestion, where a script reaches out to where your thinking already exists (Gmail) and brings it in on your schedule. You're not replacing the push workflow, you're adding a parallel track that captures the thinking you already did but never intentionally archived.
+
+**Long documents get chunked — and that changes how retrieval works.**
+Nate's guide works great for short thoughts: a paragraph, a note, a quick reflection. Emails are often much longer, and long documents are actually bad for semantic search. If you embed a 1,500-word email as a single vector, that vector becomes a blurry average of a dozen topics — and it matches poorly with almost any specific query. The fix is to split it: a 1,500-word email becomes five 300-word segments, each embedded separately with its own focused meaning. When you search, you get the relevant *section* of the email, not a low-confidence match on the whole thing. This is the core idea behind RAG (Retrieval-Augmented Generation) applied to long-form content, and it required database schema changes, updated Edge Functions, and search logic that knows how to deduplicate chunks from the same source document.
+
+**This requires more infrastructure setup and more patience than Nate's guide.**
+That guide was elegantly minimal. This one involves Google Cloud OAuth credentials, a consent screen, schema migrations, deploying updated Supabase functions, and environment variables in your shell. None of it is beyond a technically-comfortable person, but it has more moving parts and more places things can go wrong. We've documented the failure modes we hit (Part 1) and written the troubleshooting section (Part 4) from real experience. If something breaks, the answer is probably in there. Budget an hour for the first setup, not ten minutes.
+
+---
+
 ### How We Built It (The AI-Assisted Journey)
 
 This pipeline was built in a single session with Dr. Brian — an AI agent running in Cursor, playing the role of knowledge architect for Open Brain. We're sharing the story because it illustrates something important about building with AI: the hard parts aren't where you expect them.
