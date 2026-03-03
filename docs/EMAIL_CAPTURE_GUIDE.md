@@ -15,7 +15,7 @@ Nate's guide cracked the daily capture habit. You type a thought into Slack, it 
 
 Your email is different. It's thinking you already did. Every email you write is a decision, a position, a relationship update, or a problem you solved. You wrote it, you sent it, and it immediately became invisible to your AI tools.
 
-When we looked at 30 days of sent mail — Kai's school correspondence, environmental grant applications, angel investing conversations, community council work — it was 153 distinct thoughts that an AI couldn't access until now. Things like: the 1,300-word email explaining Kai's situation to his school team. The grant application narrative for HVCR flood restoration. The strategic advice email about a HubSpot data issue. All of it, in your voice, about the things that actually matter to you.
+When we looked at 30 days of sent mail — project updates, client advice, personal advocacy, community work — it was 153 distinct thoughts that an AI couldn't access until now. Long emails explaining complex situations. Narrative summaries of ongoing projects. Strategic advice to colleagues. All of it, in your voice, about the things that actually matter to you.
 
 That's what this extension adds.
 
@@ -29,7 +29,7 @@ This pipeline was built in a single session with Dr. Brian — an AI agent runni
 
 **1. Gmail's line-wrapping breaks quote detection**
 
-When you reply to an email, Gmail includes the original message prefixed with "On Mon, Mar 2, 2026 at 8:56 AM Lenny's Newsletter wrote:" — but that text wraps across 2-3 lines in plain text format. Our first attempt at stripping quoted replies only matched the whole thing on one line. Result: Lenny's Newsletter reply contained 700 words of newsletter content that looked like original writing. We caught this because one email showed 703 words when the reply was literally "hello." Fix: look ahead across multiple lines to detect the split pattern.
+When you reply to an email, Gmail includes the original message prefixed with "On Mon, Mar 2, 2026 at 8:56 AM Someone wrote:" — but that text wraps across 2-3 lines in plain text format. Our first attempt at stripping quoted replies only matched the whole thing on one line. Result: one reply contained 700 words of the original newsletter that looked like original writing. We caught this because the email showed 703 words when the reply was literally "hello." Fix: look ahead across multiple lines to detect the split pattern.
 
 **2. Supabase's PostgREST cache doesn't update instantly**
 
@@ -37,7 +37,7 @@ We added two new columns to the database — `parent_id` and `chunk_index` — t
 
 **3. A Costco Travel booking confirmation produced 23 chunks of CSS**
 
-When we added the STARRED label to pull inbound emails, the first starred email processed was a Costco Travel booking confirmation. It was 8,874 words — almost entirely CSS and HTML boilerplate, chunked into 23 meaningless fragments. The Gmail API returns the HTML version of many emails, and our HTML-to-text conversion preserved too much structure. Fix: detect CSS density (more than 10 `{...}` blocks) and skip the email, plus filter sender patterns like `no-reply`, `noreply`, `automated@`, and subject patterns like "booking confirmation," "payment due," "your receipt."
+When we added the STARRED label to pull inbound emails, the first starred email processed was a travel booking confirmation. It was 8,874 words — almost entirely CSS and HTML boilerplate, chunked into 23 meaningless fragments. The Gmail API returns the HTML version of many emails, and our HTML-to-text conversion preserved too much structure. Fix: detect CSS density (more than 10 `{...}` blocks) and skip the email, plus filter sender patterns like `no-reply`, `noreply`, `automated@`, and subject patterns like "booking confirmation," "payment due," "your receipt."
 
 **4. The Gmail label API is AND, not OR**
 
@@ -307,7 +307,7 @@ deno run --allow-net --allow-read --allow-write --allow-env \
 
 **Best starting point:** `--labels=SENT,STARRED`
 
-**Pro tip:** If you use Gmail labels to organize your life (project labels, client labels, topic labels), those become searchable metadata in your brain. The script stores all Gmail labels on each ingested thought, so you can later filter: "show me all thoughts tagged with my 'p_AngelVC' label."
+**Pro tip:** If you use Gmail labels to organize your life (project labels, client labels, topic labels), those become searchable metadata in your brain. The script stores all Gmail labels on each ingested thought, so you can later ask your AI: "show me everything I tagged as high priority" or "what have I sent related to Project X?"
 
 ---
 
@@ -393,7 +393,7 @@ Email-sourced thoughts include additional fields in their `metadata` JSONB:
 {
   "type": "observation",
   "topics": ["education", "school"],
-  "people": ["Kate", "Kai"],
+  "people": ["Alice", "Bob"],
   "sentiment": "positive",
   "source": "gmail",
   "gmail_labels": ["SENT", "IMPORTANT"],
