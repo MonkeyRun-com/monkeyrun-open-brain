@@ -3,25 +3,45 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const INGEST_KEY = Deno.env.get("INGEST_KEY") || "";
+const INGEST_KEY = Deno.env.get("INGEST_KEY")!;
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-async function generateEmbedding(text: string): Promise<number[]> {
-  const res = await fetch(`${OPENROUTER_BASE}/embeddings`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "openai/text-embedding-3-small",
-      input: text,
-    }),
-  });
-  const data = await res.json();
-  return data.data[0].embedding;
+async function generateEmbedding(text: string, retries = 2): Promise<number[]> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(`${OPENROUTER_BASE}/embeddings`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "openai/text-embedding-3-small",
+        input: text,
+      }),
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      if (attempt < retries) {
+        console.warn(`Embedding attempt ${attempt + 1} failed (${res.status}), retrying...`);
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      throw new Error(`OpenRouter embeddings failed after ${retries + 1} attempts: ${res.status} ${msg}`);
+    }
+    const data = await res.json();
+    if (!data?.data?.[0]?.embedding) {
+      if (attempt < retries) {
+        console.warn(`Embedding attempt ${attempt + 1} returned unexpected shape, retrying...`);
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      throw new Error(`OpenRouter embeddings returned unexpected shape: ${JSON.stringify(data).slice(0, 200)}`);
+    }
+    return data.data[0].embedding;
+  }
+  throw new Error("Unreachable");
 }
 
 async function extractMetadata(text: string): Promise<Record<string, unknown>> {
@@ -51,10 +71,15 @@ Only extract what's explicitly there.`,
       temperature: 0,
     }),
   });
+  if (!res.ok) {
+    console.error(`Metadata extraction failed: ${res.status}`);
+    return { type: "observation", topics: ["uncategorized"], people: [], action_items: [] };
+  }
   const data = await res.json();
   try {
     return JSON.parse(data.choices[0].message.content);
   } catch {
+    console.error("Metadata parse failed, raw response:", JSON.stringify(data).slice(0, 300));
     return { type: "observation", topics: ["uncategorized"], people: [], action_items: [] };
   }
 }
@@ -75,23 +100,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   const key = req.headers.get("x-ingest-key") || "";
-  if (INGEST_KEY && key !== INGEST_KEY) {
+  if (key !== INGEST_KEY) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
   }
 
   try {
-    const { content, source, parent_id, chunk_index } = await req.json();
+    const { content, source, parent_id, chunk_index, extra_metadata } = await req.json();
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return new Response(JSON.stringify({ error: "content is required" }), { status: 400 });
     }
 
+    // text-embedding-3-small handles ~8k tokens; cap at 8000 chars for safety
+    const embeddingInput = content.length > 8000 ? content.slice(0, 8000) : content;
     const [embedding, metadata] = await Promise.all([
-      generateEmbedding(content),
-      extractMetadata(content),
+      generateEmbedding(embeddingInput),
+      extractMetadata(embeddingInput),
     ]);
 
-    const enrichedMetadata = { ...metadata, source: source || "discord" };
+    const enrichedMetadata = {
+      ...metadata,
+      source: source || "discord",
+      ...(extra_metadata && typeof extra_metadata === "object" ? extra_metadata : {}),
+    };
 
     const { data, error } = await supabase.rpc("insert_thought", {
       p_content: content.trim(),

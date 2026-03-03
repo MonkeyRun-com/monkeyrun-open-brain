@@ -323,6 +323,92 @@ server.registerTool(
 );
 
 server.registerTool(
+  "email_sync_status",
+  {
+    title: "Email Sync Status",
+    description:
+      "Check the status of Gmail email ingestion into Open Brain. Returns total email-sourced thoughts, breakdown by Gmail label, date range of ingested emails, and the most recent sync time.",
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      const { data, error } = await supabase
+        .from("thoughts")
+        .select("metadata, created_at")
+        .eq("metadata->>source", "gmail")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      if (!data || data.length === 0) {
+        return {
+          content: [{ type: "text" as const, text: "No emails have been ingested yet. Run the Gmail pull script to get started:\n  deno run --allow-net --allow-read --allow-write --allow-env scripts/pull-gmail.ts --window=7d --labels=SENT,STARRED" }],
+        };
+      }
+
+      // Count by label
+      const labelCounts: Record<string, number> = {};
+      let chunksCount = 0;
+      let parentsCount = 0;
+      for (const r of data) {
+        const m = (r.metadata || {}) as Record<string, unknown>;
+        if (Array.isArray(m.gmail_labels)) {
+          for (const label of m.gmail_labels as string[]) {
+            labelCounts[label] = (labelCounts[label] || 0) + 1;
+          }
+        }
+      }
+
+      // Count parents vs chunks via separate queries
+      const { count: parentCount } = await supabase
+        .from("thoughts")
+        .select("*", { count: "exact", head: true })
+        .eq("metadata->>source", "gmail")
+        .is("parent_id", null);
+
+      const { count: chunkCount } = await supabase
+        .from("thoughts")
+        .select("*", { count: "exact", head: true })
+        .eq("metadata->>source", "gmail")
+        .not("parent_id", "is", null);
+
+      chunksCount = chunkCount || 0;
+      parentsCount = parentCount || 0;
+
+      const newest = new Date(data[0].created_at).toLocaleDateString();
+      const oldest = new Date(data[data.length - 1].created_at).toLocaleDateString();
+
+      const lines = [
+        `Email sync status:`,
+        `  Total email thoughts: ${data.length} (${parentsCount} documents + ${chunksCount} chunks)`,
+        `  Date range: ${oldest} → ${newest}`,
+        `  Last ingested: ${newest}`,
+        "",
+        "By Gmail label:",
+        ...Object.entries(labelCounts)
+          .sort((a, b) => b[1] - a[1])
+          .map(([label, count]) => `  ${label}: ${count}`),
+        "",
+        "To sync new emails:",
+        "  deno run --allow-net --allow-read --allow-write --allow-env scripts/pull-gmail.ts --window=7d --labels=SENT,STARRED",
+      ];
+
+      return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
   "capture_thought",
   {
     title: "Capture Thought",

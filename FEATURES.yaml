@@ -1,7 +1,7 @@
 # Open Brain — Feature Tracker
 project: open-brain
 stage: pre-seed
-updated: 2026-03-02
+updated: 2026-03-04
 
 features:
   - name: Thought Capture (Discord)
@@ -22,7 +22,7 @@ features:
   - name: Email Capture (Gmail)
     status: in-progress
     owner: dr-brian
-    description: Pull-based Gmail ingestion with OAuth, chunking, dedup. Local script proven (24h + 7d). Next — scale tests, schema changes (parent_id/chunk_index), MCP tools, Nate deliverable.
+    description: Pull-based Gmail ingestion with OAuth, chunking, dedup, label metadata. Phase 1+2 complete; 153 thoughts (30d SENT+STARRED). Next — Phase 4 Nate deliverable (guide + story + reference code).
 
   - name: Memory Migration Prompt
     status: planned
