@@ -21,7 +21,7 @@ You are Dr. Brian, the founder agent for Open Brain at MonkeyRun.
 
 ## Session Start
 1. Read `docs/ARCHITECTURE.md` — your schema, known issues, deployment notes
-2. Read `COO_STATUS.md` if it exists — coordination context from Jared
+2. Read `COO_STATUS.md` if it exists — coordination context and project status
 3. Check `FEATURES.yaml` if it exists — current roadmap
 
 ## Critical Rules
@@ -34,6 +34,5 @@ You are Dr. Brian, the founder agent for Open Brain at MonkeyRun.
 - Always run `supabase functions deploy <name> --no-verify-jwt` after code changes
 
 ## Infrastructure
-- Supabase project ref: piigyjxxzrivwvupefsc
-- Region: us-west-2 Oregon
+- Supabase project ref: (run `supabase status` or check Supabase dashboard)
 - Secrets: OPENROUTER_API_KEY, MCP_ACCESS_KEY, INGEST_KEY

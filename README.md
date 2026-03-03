@@ -28,6 +28,6 @@ supabase functions deploy ingest-thought --no-verify-jwt
 
 ## Infrastructure
 
-- **Supabase Project:** MonkeyRunOpenBrain (ref: piigyjxxzrivwvupefsc, region: us-west-2 Oregon)
+- **Supabase Project:** Your own Supabase project (see `supabase/config.toml` after `supabase link`)
 - **Auth:** Custom key-based (x-brain-key header or ?key= query param)
 - **JWT:** Disabled at function level (self-managed auth)
