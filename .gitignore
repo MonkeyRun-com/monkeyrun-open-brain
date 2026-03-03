@@ -5,3 +5,4 @@ node_modules/
 scripts/credentials.json
 scripts/token.json
 scripts/sync-log.json
+supabase/.temp/
