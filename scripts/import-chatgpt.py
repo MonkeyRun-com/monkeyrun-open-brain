@@ -57,20 +57,43 @@ OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 MIN_TOTAL_MESSAGES = 4
 MIN_USER_WORDS = 20
 SKIP_TITLE_PATTERNS = re.compile(
-    r"do not remember|forget this|don't remember|ignore this",
+    r"do not remember|forget this|don't remember|ignore this"
+    r"|limerick|haiku|poem |joke |riddle"
+    r"|image of|generate.*image|draw |create.*art"
+    r"|tooth fairy|santa letter|bedtime stor"
+    r"|translate this|what is .{1,15} in \w+",
     re.IGNORECASE,
 )
 
 SUMMARIZATION_PROMPT = """\
 You are distilling a ChatGPT conversation into standalone thoughts for a \
-personal knowledge base. Extract 1-3 key thoughts, insights, decisions, or \
-learnings from the user's messages. Each thought must be:
+personal knowledge base. Your job is to be HIGHLY SELECTIVE — only extract \
+knowledge that would be valuable to retrieve months or years from now.
+
+CAPTURE these (1-3 thoughts max):
+- Decisions made and the reasoning behind them
+- People mentioned with context (who they are, relationship, what was discussed)
+- Project plans, strategies, or architectural choices
+- Lessons learned, mistakes acknowledged, preferences discovered
+- Business context: companies, roles, goals, metrics
+- Personal values, beliefs, or frameworks articulated
+
+SKIP these entirely (return empty):
+- One-off creative tasks (poems, letters, stories, jokes)
+- Generic Q&A or factual lookups
+- Coding help with no lasting architectural decisions
+- Hypothetical explorations with no conclusion
+- Short tasks where the user just needed something written/formatted
+
+Each thought must be:
 - A clear, standalone statement (makes sense without the conversation)
 - Written in first person
+- Anchored with names, dates, or project context when available
 - 1-3 sentences
 
 Return JSON: {"thoughts": ["thought1", "thought2"]}
-If the conversation has nothing worth capturing, return {"thoughts": []}"""
+If the conversation has nothing worth capturing, return {"thoughts": []}
+Err on the side of returning empty — less is more."""
 
 # ─── Sync Log ────────────────────────────────────────────────────────────────
 
