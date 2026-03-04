@@ -290,7 +290,7 @@ def should_skip(conv, user_text, message_count, sync_log, args):
         return "too_few_messages"
 
     # Title-based skip
-    title = conv.get("title", "")
+    title = conv.get("title") or ""
     if SKIP_TITLE_PATTERNS.search(title):
         return "skip_title"
 
