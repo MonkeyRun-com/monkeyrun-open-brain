@@ -2,12 +2,16 @@
 """
 Open Brain — ChatGPT Export Importer
 
-Extracts conversations from a ChatGPT data export zip, filters trivial ones,
-summarizes each into 1-3 distilled thoughts via LLM, and ingests them into
-Open Brain through the ingest-thought endpoint.
+Extracts conversations from a ChatGPT data export (zip or extracted directory),
+filters trivial ones, summarizes each into 1-3 distilled thoughts via LLM,
+and ingests them into Open Brain through the ingest-thought endpoint.
+
+Supports both single conversations.json and the multi-file format
+(conversations-000.json through conversations-NNN.json) used in large exports.
 
 Usage:
     python scripts/import-chatgpt.py path/to/export.zip [options]
+    python scripts/import-chatgpt.py path/to/extracted-dir/ [options]
 
 Options:
     --dry-run              Parse, filter, summarize, but don't ingest
@@ -18,6 +22,7 @@ Options:
     --ollama-model NAME    Ollama model name (default: qwen3)
     --raw                  Skip summarization, ingest user messages directly
     --verbose              Show full summaries during processing
+    --report FILE          Write a markdown report of everything imported
 
 Environment variables:
     INGEST_URL             ingest-thought endpoint URL (required for live mode)
@@ -115,18 +120,64 @@ def http_post_with_retry(url, headers, body, retries=2):
 # ─── ChatGPT Export Parsing ──────────────────────────────────────────────────
 
 
-def extract_conversations(zip_path):
-    """Extract conversations.json from the ChatGPT export zip."""
-    with zipfile.ZipFile(zip_path, "r") as zf:
-        # Look for conversations.json at any level in the zip
-        candidates = [n for n in zf.namelist() if n.endswith("conversations.json")]
+def extract_conversations(source_path):
+    """Extract conversations from a ChatGPT export zip or extracted directory.
+
+    Handles both single conversations.json and the multi-file format
+    (conversations-000.json through conversations-NNN.json) that OpenAI
+    uses for large exports.
+    """
+    source = Path(source_path)
+
+    if source.is_dir():
+        return _load_conversations_from_dir(source)
+
+    with zipfile.ZipFile(source, "r") as zf:
+        conv_re = re.compile(r"(?:^|/)conversations(?:-\d+)?\.json$")
+        candidates = [n for n in zf.namelist() if conv_re.search(n)]
         if not candidates:
-            print("Error: No conversations.json found in zip archive.")
+            print("Error: No conversations JSON files found in zip archive.")
+            print("  Expected conversations.json or conversations-000.json, etc.")
             sys.exit(1)
-        # Prefer the shortest path (top-level)
-        target = min(candidates, key=len)
-        with zf.open(target) as f:
-            return json.load(f)
+
+        all_conversations = []
+        for name in sorted(candidates):
+            with zf.open(name) as f:
+                convs = json.load(f)
+                if isinstance(convs, list):
+                    all_conversations.extend(convs)
+                else:
+                    print(f"  Warning: {name} is not a JSON array, skipping.")
+        if not all_conversations:
+            print("Error: Conversation files were found but contained no data.")
+            sys.exit(1)
+        print(f"  Loaded {len(candidates)} conversation file(s) from zip.")
+        return all_conversations
+
+
+def _load_conversations_from_dir(directory):
+    """Load conversations from an already-extracted export directory."""
+    conv_re = re.compile(r"^conversations(?:-\d+)?\.json$")
+    candidates = sorted(f for f in os.listdir(directory) if conv_re.match(f))
+    if not candidates:
+        print(f"Error: No conversations JSON files found in {directory}")
+        print("  Expected conversations.json or conversations-000.json, etc.")
+        sys.exit(1)
+
+    all_conversations = []
+    for name in candidates:
+        filepath = os.path.join(directory, name)
+        with open(filepath) as f:
+            convs = json.load(f)
+            if isinstance(convs, list):
+                all_conversations.extend(convs)
+            else:
+                print(f"  Warning: {name} is not a JSON array, skipping.")
+    if not all_conversations:
+        print("Error: Conversation files were found but contained no data.")
+        sys.exit(1)
+    print(f"  Loaded {len(candidates)} conversation file(s) from directory.")
+    return all_conversations
 
 
 def conversation_hash(conv):
@@ -229,6 +280,10 @@ def should_skip(conv, user_text, message_count, sync_log, args):
             return "before_date_filter"
         if args.before and conv_date > args.before:
             return "after_date_filter"
+
+    # Explicitly marked "do not remember" by the user in ChatGPT
+    if conv.get("is_do_not_remember"):
+        return "do_not_remember"
 
     # Too few messages
     if message_count < MIN_TOTAL_MESSAGES:
@@ -390,7 +445,7 @@ Examples:
   python scripts/import-chatgpt.py export.zip --model ollama --ollama-model qwen3
   python scripts/import-chatgpt.py export.zip --raw --limit 50""",
     )
-    parser.add_argument("zip_path", help="Path to ChatGPT data export zip file")
+    parser.add_argument("zip_path", help="Path to ChatGPT data export zip file or extracted directory")
     parser.add_argument("--dry-run", action="store_true", help="Parse and summarize but don't ingest")
     parser.add_argument("--after", type=parse_date, help="Only conversations after YYYY-MM-DD")
     parser.add_argument("--before", type=parse_date, help="Only conversations before YYYY-MM-DD")
@@ -399,6 +454,7 @@ Examples:
     parser.add_argument("--ollama-model", default="qwen3", help="Ollama model name (default: qwen3)")
     parser.add_argument("--raw", action="store_true", help="Skip summarization, ingest user messages directly")
     parser.add_argument("--verbose", action="store_true", help="Show full summaries during processing")
+    parser.add_argument("--report", type=str, metavar="FILE", help="Write a markdown report of everything imported")
     return parser.parse_args()
 
 
@@ -408,8 +464,8 @@ Examples:
 def main():
     args = parse_args()
 
-    if not os.path.isfile(args.zip_path):
-        print(f"Error: File not found: {args.zip_path}")
+    if not os.path.isfile(args.zip_path) and not os.path.isdir(args.zip_path):
+        print(f"Error: Path not found: {args.zip_path}")
         sys.exit(1)
 
     # Validate env vars for live mode
@@ -461,6 +517,7 @@ def main():
     ingested = 0
     errors = 0
     total_user_words = 0
+    report_entries = []
 
     for conv in conversations:
         # Respect limit
@@ -520,6 +577,15 @@ def main():
             for i, thought in enumerate(thoughts, 1):
                 preview = thought if len(thought) <= 200 else thought[:200] + "..."
                 print(f"   Thought {i}: {preview}")
+
+        if args.report:
+            report_entries.append({
+                "title": title,
+                "date": date_str,
+                "messages": message_count,
+                "user_words": word_count,
+                "thoughts": thoughts,
+            })
 
         if args.dry_run:
             print()
@@ -590,6 +656,51 @@ def main():
         print(f"    Summarization:        ${summarize_cost:.4f}")
         print(f"    Ingestion:            ${ingest_cost:.4f}")
     print("─" * 60)
+
+    if args.report and report_entries:
+        _write_report(args.report, report_entries, {
+            "total": total,
+            "already_imported": already_imported,
+            "filtered": filtered,
+            "filter_reasons": filter_reasons,
+            "processed": processed,
+            "thoughts_generated": thoughts_generated,
+            "ingested": ingested,
+            "errors": errors,
+            "total_user_words": total_user_words,
+            "dry_run": args.dry_run,
+        })
+
+
+def _write_report(filepath, entries, stats):
+    """Write a markdown report of imported conversations."""
+    with open(filepath, "w") as f:
+        mode = "DRY RUN" if stats["dry_run"] else "LIVE"
+        f.write(f"# ChatGPT Import Report ({mode})\n\n")
+        f.write(f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n\n")
+
+        f.write("## Stats\n\n")
+        f.write(f"| Metric | Value |\n|--------|-------|\n")
+        f.write(f"| Conversations found | {stats['total']} |\n")
+        f.write(f"| Already imported | {stats['already_imported']} |\n")
+        f.write(f"| Filtered (trivial) | {stats['filtered']} |\n")
+        f.write(f"| Processed | {stats['processed']} |\n")
+        f.write(f"| Thoughts generated | {stats['thoughts_generated']} |\n")
+        if not stats["dry_run"]:
+            f.write(f"| Ingested | {stats['ingested']} |\n")
+            f.write(f"| Errors | {stats['errors']} |\n")
+        f.write(f"| Total user words | {stats['total_user_words']:,} |\n")
+        f.write("\n")
+
+        f.write("## Conversations\n\n")
+        for entry in entries:
+            f.write(f"### {entry['title']} ({entry['date']})\n\n")
+            f.write(f"_{entry['messages']} messages, {entry['user_words']} user words_\n\n")
+            for i, thought in enumerate(entry["thoughts"], 1):
+                f.write(f"{i}. {thought}\n")
+            f.write("\n")
+
+    print(f"\nReport written to {filepath}")
 
 
 if __name__ == "__main__":
