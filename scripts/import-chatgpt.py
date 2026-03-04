@@ -421,19 +421,23 @@ def summarize(title, date_str, user_text, args):
 # ─── Ingestion ───────────────────────────────────────────────────────────────
 
 
-def ingest_thought(content, extra_metadata):
+def ingest_thought(content, extra_metadata, full_text=None):
     """POST a thought to the ingest-thought endpoint."""
+    body = {
+        "content": content,
+        "source": "chatgpt",
+        "extra_metadata": extra_metadata,
+    }
+    if full_text:
+        body["full_text"] = full_text
+
     resp = http_post_with_retry(
         INGEST_URL,
         headers={
             "Content-Type": "application/json",
             "x-ingest-key": INGEST_KEY,
         },
-        body={
-            "content": content,
-            "source": "chatgpt",
-            "extra_metadata": extra_metadata,
-        },
+        body=body,
     )
 
     if not resp:
@@ -634,7 +638,7 @@ def main():
         all_ok = True
         for i, thought in enumerate(thoughts):
             content = f"[ChatGPT: {title} | {date_str}] {thought}"
-            result = ingest_thought(content, extra_metadata)
+            result = ingest_thought(content, extra_metadata, full_text=user_text)
 
             if result.get("ok"):
                 ingested += 1

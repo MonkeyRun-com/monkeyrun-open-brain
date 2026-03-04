@@ -105,7 +105,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { content, source, parent_id, chunk_index, extra_metadata } = await req.json();
+    const { content, source, parent_id, chunk_index, extra_metadata, full_text } = await req.json();
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       return new Response(JSON.stringify({ error: "content is required" }), { status: 400 });
@@ -130,6 +130,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       p_metadata: enrichedMetadata,
       p_parent_id: parent_id || null,
       p_chunk_index: chunk_index ?? null,
+      p_full_text: (full_text && typeof full_text === "string") ? full_text.trim() : null,
     });
 
     if (error) {

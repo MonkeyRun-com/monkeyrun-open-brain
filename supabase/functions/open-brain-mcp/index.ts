@@ -83,9 +83,10 @@ server.registerTool(
       query: z.string().describe("What to search for"),
       limit: z.number().optional().default(10),
       threshold: z.number().optional().default(0.1),
+      include_full_text: z.boolean().optional().default(false).describe("Include the full original source text in results (emails, conversations, etc.)"),
     },
   },
-  async ({ query, limit, threshold }) => {
+  async ({ query, limit, threshold, include_full_text }) => {
     try {
       const qEmb = await getEmbedding(query);
       // Fetch extra results to account for chunk deduplication
@@ -135,6 +136,7 @@ server.registerTool(
           t: {
             id: string;
             content: string;
+            full_text: string | null;
             metadata: Record<string, unknown>;
             similarity: number;
             created_at: string;
@@ -144,6 +146,7 @@ server.registerTool(
           i: number
         ) => {
           const m = t.metadata || {};
+          const sourceRef = m.source_ref as Record<string, string> | undefined;
           const parts = [
             `--- Result ${i + 1} (${(t.similarity * 100).toFixed(1)}% match) ---`,
             `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
@@ -158,7 +161,11 @@ server.registerTool(
             parts.push(`People: ${(m.people as string[]).join(", ")}`);
           if (Array.isArray(m.action_items) && m.action_items.length)
             parts.push(`Actions: ${(m.action_items as string[]).join("; ")}`);
+          if (sourceRef?.url)
+            parts.push(`Source: ${sourceRef.url}`);
           parts.push(`\n${t.content}`);
+          if (include_full_text && t.full_text)
+            parts.push(`\nFull text:\n${t.full_text}`);
           return parts.join("\n");
         }
       );
