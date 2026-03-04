@@ -574,9 +574,18 @@ def main():
             else "unknown"
         )
         conv_id = conversation_hash(conv)
+        chatgpt_id = conv.get("id", "")
+        source_ref = {
+            "type": "chatgpt",
+            "conversation_id": chatgpt_id,
+            "url": f"https://chatgpt.com/c/{chatgpt_id}" if chatgpt_id else "",
+            "title": title,
+            "date": date_str,
+        }
 
         print(f"{processed}. {title}")
-        print(f"   {message_count} messages | {word_count} user words | {date_str}")
+        url_display = source_ref["url"] if source_ref["url"] else "no id"
+        print(f"   {message_count} messages | {word_count} user words | {date_str} | {url_display}")
 
         # Summarize or use raw
         if args.raw:
@@ -619,6 +628,7 @@ def main():
             "chatgpt_title": title,
             "chatgpt_create_time": date_str,
             "chatgpt_conversation_hash": conv_id,
+            "source_ref": source_ref,
         }
 
         all_ok = True
