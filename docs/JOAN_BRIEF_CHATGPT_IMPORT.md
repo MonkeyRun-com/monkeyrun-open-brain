@@ -104,8 +104,8 @@ Estimated time: ~90 minutes. Estimated API cost: ~$1.27.
 | Conversation files in zip | 22 (multi-file format) |
 | Export size | ~188MB |
 | Filter rate (trivial convs skipped) | ~40-50% estimated |
-| Thoughts generated | TBD — estimated 400-600 |
-| Estimated API cost (summarization + ingestion) | ~$1.27 |
+| Thoughts generated | 823 |
+| Actual API cost (summarization + ingestion) | $0.32 |
 | Total wall-clock time for the session | ~4 hours (including re-runs) |
 | Re-runs required | 3 (first run: baseline; second: source links; third: full-text) |
 | Cost per re-run decision | $0 — we stopped early each time |
