@@ -5,4 +5,6 @@ node_modules/
 scripts/credentials.json
 scripts/token.json
 scripts/sync-log.json
+scripts/chatgpt-sync-log.json
+__pycache__/
 supabase/.temp/
