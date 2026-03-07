@@ -319,6 +319,16 @@ server.registerTool(
         for (const [k, v] of sort(people)) lines.push(`  ${k}: ${v}`);
       }
 
+      // Overdue follow-ups count from contacts
+      const { count: overdueCount } = await supabase
+        .from("contacts")
+        .select("*", { count: "exact", head: true })
+        .lte("next_followup", new Date().toISOString());
+
+      if (overdueCount !== null && overdueCount > 0) {
+        lines.push("", `Overdue follow-ups: ${overdueCount}`);
+      }
+
       return { content: [{ type: "text" as const, text: lines.join("\n") }] };
     } catch (err: unknown) {
       return {
@@ -453,6 +463,401 @@ server.registerTool(
         confirmation += ` | People: ${(meta.people as string[]).join(", ")}`;
       if (Array.isArray(meta.action_items) && meta.action_items.length)
         confirmation += ` | Actions: ${(meta.action_items as string[]).join("; ")}`;
+
+      return {
+        content: [{ type: "text" as const, text: confirmation }],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+// --- Contact CRM Tools (Issue #5) ---
+
+function buildContactEmbeddingText(contact: {
+  name: string;
+  role?: string | null;
+  organization?: string | null;
+  relationship?: string | null;
+  context?: string | null;
+  tags?: string[] | null;
+}): string {
+  const parts = [contact.name];
+  if (contact.role && contact.organization) {
+    parts.push(`- ${contact.role} at ${contact.organization}`);
+  } else if (contact.role) {
+    parts.push(`- ${contact.role}`);
+  } else if (contact.organization) {
+    parts.push(`at ${contact.organization}`);
+  }
+  if (contact.relationship) parts.push(`. ${contact.relationship}`);
+  if (contact.context) parts.push(`. ${contact.context}`);
+  if (contact.tags?.length) parts.push(`. Tags: ${contact.tags.join(", ")}`);
+  return parts.join(" ");
+}
+
+server.registerTool(
+  "upsert_contact",
+  {
+    title: "Create or Update Contact",
+    description:
+      "Add a new contact or update an existing one in the CRM. Matches by email first, then name+org, then name alone. Merges data on update (appends context, unions tags, keeps latest last_contact).",
+    inputSchema: {
+      name: z.string().describe("Contact's full name"),
+      email: z.string().optional().describe("Email address"),
+      phone: z.string().optional().describe("Phone number"),
+      organization: z.string().optional().describe("Company or organization"),
+      role: z.string().optional().describe("Job title or role"),
+      relationship: z.string().optional().describe("advisor, investor, founder, medical, family, friend, colleague, client"),
+      context: z.string().optional().describe("Free-form notes: how we know them, background"),
+      tags: z.array(z.string()).optional().default([]).describe("Tags for categorization"),
+      last_contact: z.string().optional().describe("ISO date of last contact"),
+      next_followup: z.string().optional().describe("ISO date for next follow-up"),
+      followup_note: z.string().optional().describe("What to follow up about"),
+    },
+  },
+  async ({ name, email, phone, organization, role, relationship, context, tags, last_contact, next_followup, followup_note }) => {
+    try {
+      const embeddingText = buildContactEmbeddingText({ name, role, organization, relationship, context, tags });
+      const embedding = await getEmbedding(embeddingText);
+
+      const { data, error } = await supabase.rpc("upsert_contact", {
+        p_name: name,
+        p_email: email || null,
+        p_phone: phone || null,
+        p_organization: organization || null,
+        p_role: role || null,
+        p_relationship: relationship || null,
+        p_context: context || null,
+        p_tags: tags || [],
+        p_last_contact: last_contact || null,
+        p_next_followup: next_followup || null,
+        p_followup_note: followup_note || null,
+        p_embedding: embedding,
+      });
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Upsert error: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      const result = data as { id: string; action: string; matched_on: string | null; message?: string; matches?: unknown[] };
+
+      if (result.action === "disambiguation_needed") {
+        const matchList = (result.matches as { name: string; organization: string; email: string }[])
+          .map((m) => `  - ${m.name}${m.organization ? ` (${m.organization})` : ""}${m.email ? ` <${m.email}>` : ""}`)
+          .join("\n");
+        return {
+          content: [{ type: "text" as const, text: `Multiple contacts match "${name}":\n${matchList}\n\nPlease provide email or organization to disambiguate.` }],
+        };
+      }
+
+      const actionVerb = result.action === "created" ? "Created" : "Updated";
+      const matchInfo = result.matched_on ? ` (matched on ${result.matched_on})` : "";
+      return {
+        content: [{ type: "text" as const, text: `${actionVerb} contact: ${name}${matchInfo}` }],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "lookup_contact",
+  {
+    title: "Look Up Contact",
+    description:
+      "Search for contacts by meaning. Use when the user asks about a person, relationship, or role. Returns a dossier with optional recent interactions and related thoughts.",
+    inputSchema: {
+      query: z.string().describe("Who to search for — name, role, context, etc."),
+      limit: z.number().optional().default(5),
+      include_interactions: z.boolean().optional().default(true).describe("Include recent interactions"),
+      include_thoughts: z.boolean().optional().default(false).describe("Include related thoughts from knowledge base"),
+    },
+  },
+  async ({ query, limit, include_interactions, include_thoughts }) => {
+    try {
+      const qEmb = await getEmbedding(query);
+      const { data, error } = await supabase.rpc("match_contacts", {
+        query_embedding: qEmb,
+        match_threshold: 0.1,
+        match_count: limit,
+      });
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Search error: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      if (!data || data.length === 0) {
+        return {
+          content: [{ type: "text" as const, text: `No contacts found matching "${query}".` }],
+        };
+      }
+
+      const dossiers: string[] = [];
+
+      for (const c of data as {
+        id: string; name: string; email: string | null; organization: string | null;
+        role: string | null; relationship: string | null; context: string | null;
+        tags: string[]; last_contact: string | null; next_followup: string | null;
+        followup_note: string | null; metadata: Record<string, unknown>;
+        similarity: number; created_at: string;
+      }[]) {
+        const parts = [
+          `--- ${c.name} (${(c.similarity * 100).toFixed(1)}% match) ---`,
+        ];
+        if (c.role || c.organization) {
+          parts.push(`${c.role || ""}${c.role && c.organization ? " at " : ""}${c.organization || ""}`);
+        }
+        if (c.relationship) parts.push(`Relationship: ${c.relationship}`);
+        if (c.email) parts.push(`Email: ${c.email}`);
+        if (c.tags?.length) parts.push(`Tags: ${c.tags.join(", ")}`);
+        if (c.last_contact) parts.push(`Last contact: ${new Date(c.last_contact).toLocaleDateString()}`);
+        if (c.next_followup) {
+          const isOverdue = new Date(c.next_followup) <= new Date();
+          parts.push(`Follow-up: ${new Date(c.next_followup).toLocaleDateString()}${isOverdue ? " (OVERDUE)" : ""}`);
+          if (c.followup_note) parts.push(`Follow-up note: ${c.followup_note}`);
+        }
+        if (c.context) parts.push(`Context: ${c.context}`);
+
+        // Fetch recent interactions
+        if (include_interactions) {
+          const { data: interactions } = await supabase
+            .from("interactions")
+            .select("type, summary, occurred_at")
+            .eq("contact_id", c.id)
+            .order("occurred_at", { ascending: false })
+            .limit(5);
+
+          if (interactions?.length) {
+            parts.push("", "Recent interactions:");
+            for (const ix of interactions) {
+              parts.push(`  [${new Date(ix.occurred_at).toLocaleDateString()}] (${ix.type}) ${ix.summary}`);
+            }
+          }
+        }
+
+        // Search related thoughts
+        if (include_thoughts) {
+          const { data: thoughts } = await supabase
+            .from("thoughts")
+            .select("content, metadata, created_at")
+            .contains("metadata", { people: [c.name] })
+            .order("created_at", { ascending: false })
+            .limit(5);
+
+          if (thoughts?.length) {
+            parts.push("", "Related thoughts:");
+            for (const t of thoughts) {
+              parts.push(`  [${new Date(t.created_at).toLocaleDateString()}] ${t.content.substring(0, 150)}${t.content.length > 150 ? "..." : ""}`);
+            }
+          }
+        }
+
+        dossiers.push(parts.join("\n"));
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Found ${data.length} contact(s):\n\n${dossiers.join("\n\n")}`,
+          },
+        ],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "list_contacts",
+  {
+    title: "List Contacts",
+    description:
+      "List contacts with optional filters by organization, relationship type, tag, or overdue follow-ups.",
+    inputSchema: {
+      organization: z.string().optional().describe("Filter by organization (case-insensitive partial match)"),
+      relationship: z.string().optional().describe("Filter by relationship type: advisor, investor, founder, medical, family, friend, colleague, client"),
+      tag: z.string().optional().describe("Filter by tag"),
+      followup_due: z.boolean().optional().default(false).describe("Only show contacts with overdue follow-ups"),
+      followup_days: z.number().optional().describe("Show contacts with follow-ups due within N days"),
+      limit: z.number().optional().default(20),
+    },
+  },
+  async ({ organization, relationship, tag, followup_due, followup_days, limit }) => {
+    try {
+      let q = supabase
+        .from("contacts")
+        .select("id, name, email, organization, role, relationship, tags, last_contact, next_followup, followup_note, context")
+        .order("last_contact", { ascending: false, nullsFirst: false })
+        .limit(limit);
+
+      if (organization) q = q.ilike("organization", `%${organization}%`);
+      if (relationship) q = q.eq("relationship", relationship);
+      if (tag) q = q.contains("tags", [tag]);
+      if (followup_due) {
+        q = q.lte("next_followup", new Date().toISOString());
+      } else if (followup_days) {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() + followup_days);
+        q = q.lte("next_followup", cutoff.toISOString());
+      }
+
+      const { data, error } = await q;
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Error: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      if (!data || !data.length) {
+        return { content: [{ type: "text" as const, text: "No contacts found matching filters." }] };
+      }
+
+      const results = data.map(
+        (c: {
+          name: string; email: string | null; organization: string | null;
+          role: string | null; relationship: string | null; tags: string[];
+          last_contact: string | null; next_followup: string | null;
+          followup_note: string | null; context: string | null;
+        }, i: number) => {
+          const parts = [`${i + 1}. ${c.name}`];
+          if (c.role || c.organization) {
+            parts[0] += ` — ${c.role || ""}${c.role && c.organization ? " at " : ""}${c.organization || ""}`;
+          }
+          if (c.relationship) parts.push(`   Relationship: ${c.relationship}`);
+          if (c.tags?.length) parts.push(`   Tags: ${c.tags.join(", ")}`);
+          if (c.last_contact) parts.push(`   Last contact: ${new Date(c.last_contact).toLocaleDateString()}`);
+          if (c.next_followup) {
+            const isOverdue = new Date(c.next_followup) <= new Date();
+            parts.push(`   Follow-up: ${new Date(c.next_followup).toLocaleDateString()}${isOverdue ? " (OVERDUE)" : ""}${c.followup_note ? ` — ${c.followup_note}` : ""}`);
+          }
+          return parts.join("\n");
+        }
+      );
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `${data.length} contact(s):\n\n${results.join("\n\n")}`,
+          },
+        ],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "log_interaction",
+  {
+    title: "Log Interaction",
+    description:
+      "Record an interaction with a contact (meeting, call, email, coffee, event, note). Updates last_contact automatically. Optionally set a follow-up date.",
+    inputSchema: {
+      contact_name: z.string().describe("Name of the contact (case-insensitive match)"),
+      type: z.string().optional().default("note").describe("Type: meeting, call, email, coffee, event, note"),
+      summary: z.string().describe("What happened / what was discussed"),
+      occurred_at: z.string().optional().describe("ISO date when it happened (defaults to now)"),
+      next_followup: z.string().optional().describe("ISO date for next follow-up"),
+      followup_note: z.string().optional().describe("What to follow up about"),
+    },
+  },
+  async ({ contact_name, type, summary, occurred_at, next_followup, followup_note }) => {
+    try {
+      // Find contact by name (case-insensitive)
+      const { data: matches, error: findError } = await supabase
+        .from("contacts")
+        .select("id, name, organization")
+        .ilike("name", contact_name);
+
+      if (findError) {
+        return {
+          content: [{ type: "text" as const, text: `Error finding contact: ${findError.message}` }],
+          isError: true,
+        };
+      }
+
+      if (!matches || matches.length === 0) {
+        return {
+          content: [{ type: "text" as const, text: `No contact found matching "${contact_name}". Create them first with upsert_contact.` }],
+          isError: true,
+        };
+      }
+
+      if (matches.length > 1) {
+        const list = matches.map((m: { name: string; organization: string | null }) =>
+          `  - ${m.name}${m.organization ? ` (${m.organization})` : ""}`
+        ).join("\n");
+        return {
+          content: [{ type: "text" as const, text: `Multiple contacts match "${contact_name}":\n${list}\n\nPlease use a more specific name.` }],
+        };
+      }
+
+      const contact = matches[0];
+      const interactionTime = occurred_at || new Date().toISOString();
+
+      // Insert interaction
+      const { error: insertError } = await supabase
+        .from("interactions")
+        .insert({
+          contact_id: contact.id,
+          type: type,
+          summary: summary,
+          occurred_at: interactionTime,
+        });
+
+      if (insertError) {
+        return {
+          content: [{ type: "text" as const, text: `Error logging interaction: ${insertError.message}` }],
+          isError: true,
+        };
+      }
+
+      // Update contact's last_contact (and optionally followup)
+      const contactUpdate: Record<string, unknown> = {
+        last_contact: interactionTime,
+      };
+      if (next_followup) {
+        contactUpdate.next_followup = next_followup;
+        contactUpdate.followup_note = followup_note || null;
+      }
+
+      await supabase
+        .from("contacts")
+        .update(contactUpdate)
+        .eq("id", contact.id);
+
+      let confirmation = `Logged ${type} with ${contact.name}: "${summary}"`;
+      if (next_followup) {
+        confirmation += `\nFollow-up set for ${new Date(next_followup).toLocaleDateString()}`;
+        if (followup_note) confirmation += `: ${followup_note}`;
+      }
 
       return {
         content: [{ type: "text" as const, text: confirmation }],
