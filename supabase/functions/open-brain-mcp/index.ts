@@ -14,6 +14,12 @@ const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+const USER_TIMEZONE = "America/Los_Angeles";
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { timeZone: USER_TIMEZONE });
+}
+
 async function getEmbedding(text: string): Promise<number[]> {
   const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
     method: "POST",
@@ -149,7 +155,7 @@ server.registerTool(
           const sourceRef = m.source_ref as Record<string, string> | undefined;
           const parts = [
             `--- Result ${i + 1} (${(t.similarity * 100).toFixed(1)}% match) ---`,
-            `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
+            `Captured: ${formatDate(t.created_at)}`,
             `Type: ${m.type || "unknown"}`,
           ];
           if (t.parent_id && parentChunkCounts[t.parent_id] > 1) {
@@ -238,7 +244,7 @@ server.registerTool(
         ) => {
           const m = t.metadata || {};
           const tags = Array.isArray(m.topics) ? (m.topics as string[]).join(", ") : "";
-          return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
+          return `${i + 1}. [${formatDate(t.created_at)}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
         }
       );
 
@@ -299,9 +305,9 @@ server.registerTool(
         `Total thoughts: ${count}`,
         `Date range: ${
           data?.length
-            ? new Date(data[data.length - 1].created_at).toLocaleDateString() +
+            ? formatDate(data[data.length - 1].created_at) +
               " → " +
-              new Date(data[0].created_at).toLocaleDateString()
+              formatDate(data[0].created_at)
             : "N/A"
         }`,
         "",
@@ -397,8 +403,8 @@ server.registerTool(
       chunksCount = chunkCount || 0;
       parentsCount = parentCount || 0;
 
-      const newest = new Date(data[0].created_at).toLocaleDateString();
-      const oldest = new Date(data[data.length - 1].created_at).toLocaleDateString();
+      const newest = formatDate(data[0].created_at);
+      const oldest = formatDate(data[data.length - 1].created_at);
 
       const lines = [
         `Email sync status:`,
@@ -518,9 +524,10 @@ server.registerTool(
       last_contact: z.string().optional().describe("ISO date of last contact"),
       next_followup: z.string().optional().describe("ISO date for next follow-up"),
       followup_note: z.string().optional().describe("What to follow up about"),
+      clear_followup: z.boolean().optional().default(false).describe("Clear existing follow-up (set next_followup and followup_note to null)"),
     },
   },
-  async ({ name, email, phone, organization, role, relationship, context, tags, last_contact, next_followup, followup_note }) => {
+  async ({ name, email, phone, organization, role, relationship, context, tags, last_contact, next_followup, followup_note, clear_followup }) => {
     try {
       const embeddingText = buildContactEmbeddingText({ name, role, organization, relationship, context, tags });
       const embedding = await getEmbedding(embeddingText);
@@ -538,6 +545,7 @@ server.registerTool(
         p_next_followup: next_followup || null,
         p_followup_note: followup_note || null,
         p_embedding: embedding,
+        p_clear_followup: clear_followup || false,
       });
 
       if (error) {
@@ -610,11 +618,11 @@ server.registerTool(
       const dossiers: string[] = [];
 
       for (const c of data as {
-        id: string; name: string; email: string | null; organization: string | null;
-        role: string | null; relationship: string | null; context: string | null;
-        tags: string[]; last_contact: string | null; next_followup: string | null;
-        followup_note: string | null; metadata: Record<string, unknown>;
-        similarity: number; created_at: string;
+        id: string; name: string; email: string | null; phone: string | null;
+        organization: string | null; role: string | null; relationship: string | null;
+        context: string | null; tags: string[]; last_contact: string | null;
+        next_followup: string | null; followup_note: string | null;
+        metadata: Record<string, unknown>; similarity: number; created_at: string;
       }[]) {
         const parts = [
           `--- ${c.name} (${(c.similarity * 100).toFixed(1)}% match) ---`,
@@ -624,11 +632,12 @@ server.registerTool(
         }
         if (c.relationship) parts.push(`Relationship: ${c.relationship}`);
         if (c.email) parts.push(`Email: ${c.email}`);
+        if (c.phone) parts.push(`Phone: ${c.phone}`);
         if (c.tags?.length) parts.push(`Tags: ${c.tags.join(", ")}`);
-        if (c.last_contact) parts.push(`Last contact: ${new Date(c.last_contact).toLocaleDateString()}`);
+        if (c.last_contact) parts.push(`Last contact: ${formatDate(c.last_contact)}`);
         if (c.next_followup) {
           const isOverdue = new Date(c.next_followup) <= new Date();
-          parts.push(`Follow-up: ${new Date(c.next_followup).toLocaleDateString()}${isOverdue ? " (OVERDUE)" : ""}`);
+          parts.push(`Follow-up: ${formatDate(c.next_followup)}${isOverdue ? " (OVERDUE)" : ""}`);
           if (c.followup_note) parts.push(`Follow-up note: ${c.followup_note}`);
         }
         if (c.context) parts.push(`Context: ${c.context}`);
@@ -645,7 +654,7 @@ server.registerTool(
           if (interactions?.length) {
             parts.push("", "Recent interactions:");
             for (const ix of interactions) {
-              parts.push(`  [${new Date(ix.occurred_at).toLocaleDateString()}] (${ix.type}) ${ix.summary}`);
+              parts.push(`  [${formatDate(ix.occurred_at)}] (${ix.type}) ${ix.summary}`);
             }
           }
         }
@@ -662,7 +671,7 @@ server.registerTool(
           if (thoughts?.length) {
             parts.push("", "Related thoughts:");
             for (const t of thoughts) {
-              parts.push(`  [${new Date(t.created_at).toLocaleDateString()}] ${t.content.substring(0, 150)}${t.content.length > 150 ? "..." : ""}`);
+              parts.push(`  [${formatDate(t.created_at)}] ${t.content.substring(0, 150)}${t.content.length > 150 ? "..." : ""}`);
             }
           }
         }
@@ -747,10 +756,10 @@ server.registerTool(
           }
           if (c.relationship) parts.push(`   Relationship: ${c.relationship}`);
           if (c.tags?.length) parts.push(`   Tags: ${c.tags.join(", ")}`);
-          if (c.last_contact) parts.push(`   Last contact: ${new Date(c.last_contact).toLocaleDateString()}`);
+          if (c.last_contact) parts.push(`   Last contact: ${formatDate(c.last_contact)}`);
           if (c.next_followup) {
             const isOverdue = new Date(c.next_followup) <= new Date();
-            parts.push(`   Follow-up: ${new Date(c.next_followup).toLocaleDateString()}${isOverdue ? " (OVERDUE)" : ""}${c.followup_note ? ` — ${c.followup_note}` : ""}`);
+            parts.push(`   Follow-up: ${formatDate(c.next_followup)}${isOverdue ? " (OVERDUE)" : ""}${c.followup_note ? ` — ${c.followup_note}` : ""}`);
           }
           return parts.join("\n");
         }
@@ -786,9 +795,10 @@ server.registerTool(
       occurred_at: z.string().optional().describe("ISO date when it happened (defaults to now)"),
       next_followup: z.string().optional().describe("ISO date for next follow-up"),
       followup_note: z.string().optional().describe("What to follow up about"),
+      clear_followup: z.boolean().optional().default(false).describe("Clear the existing follow-up (use when logging the interaction that was the follow-up)"),
     },
   },
-  async ({ contact_name, type, summary, occurred_at, next_followup, followup_note }) => {
+  async ({ contact_name, type, summary, occurred_at, next_followup, followup_note, clear_followup }) => {
     try {
       // Find contact by name (case-insensitive)
       const { data: matches, error: findError } = await supabase
@@ -843,7 +853,10 @@ server.registerTool(
       const contactUpdate: Record<string, unknown> = {
         last_contact: interactionTime,
       };
-      if (next_followup) {
+      if (clear_followup) {
+        contactUpdate.next_followup = null;
+        contactUpdate.followup_note = null;
+      } else if (next_followup) {
         contactUpdate.next_followup = next_followup;
         contactUpdate.followup_note = followup_note || null;
       }
@@ -854,13 +867,80 @@ server.registerTool(
         .eq("id", contact.id);
 
       let confirmation = `Logged ${type} with ${contact.name}: "${summary}"`;
-      if (next_followup) {
-        confirmation += `\nFollow-up set for ${new Date(next_followup).toLocaleDateString()}`;
+      if (clear_followup) {
+        confirmation += `\nFollow-up cleared.`;
+      } else if (next_followup) {
+        confirmation += `\nFollow-up set for ${formatDate(next_followup)}`;
         if (followup_note) confirmation += `: ${followup_note}`;
       }
 
       return {
         content: [{ type: "text" as const, text: confirmation }],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "delete_contact",
+  {
+    title: "Delete Contact",
+    description:
+      "Delete a contact and all their interactions from the CRM. Use when a contact was created by mistake or is no longer relevant.",
+    inputSchema: {
+      contact_name: z.string().describe("Name of the contact to delete (case-insensitive match)"),
+    },
+  },
+  async ({ contact_name }) => {
+    try {
+      const { data: matches, error: findError } = await supabase
+        .from("contacts")
+        .select("id, name, organization")
+        .ilike("name", contact_name);
+
+      if (findError) {
+        return {
+          content: [{ type: "text" as const, text: `Error finding contact: ${findError.message}` }],
+          isError: true,
+        };
+      }
+
+      if (!matches || matches.length === 0) {
+        return {
+          content: [{ type: "text" as const, text: `No contact found matching "${contact_name}".` }],
+          isError: true,
+        };
+      }
+
+      if (matches.length > 1) {
+        const list = matches.map((m: { name: string; organization: string | null }) =>
+          `  - ${m.name}${m.organization ? ` (${m.organization})` : ""}`
+        ).join("\n");
+        return {
+          content: [{ type: "text" as const, text: `Multiple contacts match "${contact_name}":\n${list}\n\nPlease use a more specific name.` }],
+        };
+      }
+
+      const contact = matches[0];
+      const { error: deleteError } = await supabase
+        .from("contacts")
+        .delete()
+        .eq("id", contact.id);
+
+      if (deleteError) {
+        return {
+          content: [{ type: "text" as const, text: `Error deleting contact: ${deleteError.message}` }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [{ type: "text" as const, text: `Deleted contact: ${contact.name}${contact.organization ? ` (${contact.organization})` : ""}. All interactions have been removed.` }],
       };
     } catch (err: unknown) {
       return {

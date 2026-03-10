@@ -6,5 +6,7 @@ scripts/credentials.json
 scripts/token.json
 scripts/sync-log.json
 scripts/chatgpt-sync-log.json
+scripts/token-contacts.json
+scripts/google-contacts-sync-log.json
 __pycache__/
 supabase/.temp/
