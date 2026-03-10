@@ -1,8 +1,10 @@
 # Meeting: Jonathan Edwards — Open Brain Project Discussion
 
-> Date: ~March 10–11, 2026 (7:00–7:30 AM, rescheduling in progress)
+> Date: March 10, 2026 — ~10AM PDT ✅ COMPLETED
 > Attendees: Matt Hallett, Jonathan Edwards
-> Format: TBD (video call likely)
+> Format: Zoom (~1hr 15min)
+> Full debrief: MEETING-DEBRIEF-2026-03-10.md
+> Raw transcript: TRANSCRIPT-JONATHAN-2026-03-10.txt
 
 ---
 
