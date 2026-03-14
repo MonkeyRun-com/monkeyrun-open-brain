@@ -89,10 +89,11 @@ server.registerTool(
       query: z.string().describe("What to search for"),
       limit: z.number().optional().default(10),
       threshold: z.number().optional().default(0.1),
+      source: z.string().optional().describe("Filter by source: mcp, gmail, chatgpt, obsidian"),
       include_full_text: z.boolean().optional().default(false).describe("Include the full original source text in results (emails, conversations, etc.)"),
     },
   },
-  async ({ query, limit, threshold, include_full_text }) => {
+  async ({ query, limit, threshold, source, include_full_text }) => {
     try {
       const qEmb = await getEmbedding(query);
       // Fetch extra results to account for chunk deduplication
@@ -100,7 +101,7 @@ server.registerTool(
         query_embedding: qEmb,
         match_threshold: threshold,
         match_count: limit * 3,
-        filter: {},
+        filter: source ? { source } : {},
       });
 
       if (error) {
@@ -205,9 +206,10 @@ server.registerTool(
       topic: z.string().optional().describe("Filter by topic tag"),
       person: z.string().optional().describe("Filter by person mentioned"),
       days: z.number().optional().describe("Only thoughts from the last N days"),
+      source: z.string().optional().describe("Filter by source: mcp, gmail, chatgpt, obsidian"),
     },
   },
-  async ({ limit, type, topic, person, days }) => {
+  async ({ limit, type, topic, person, days, source }) => {
     try {
       let q = supabase
         .from("thoughts")
@@ -223,6 +225,7 @@ server.registerTool(
         since.setDate(since.getDate() - days);
         q = q.gte("created_at", since.toISOString());
       }
+      if (source) q = q.contains("metadata", { source });
 
       const { data, error } = await q;
 
@@ -286,10 +289,12 @@ server.registerTool(
       const types: Record<string, number> = {};
       const topics: Record<string, number> = {};
       const people: Record<string, number> = {};
+      const sources: Record<string, number> = {};
 
       for (const r of data || []) {
         const m = (r.metadata || {}) as Record<string, unknown>;
         if (m.type) types[m.type as string] = (types[m.type as string] || 0) + 1;
+        if (m.source) sources[m.source as string] = (sources[m.source as string] || 0) + 1;
         if (Array.isArray(m.topics))
           for (const t of m.topics) topics[t as string] = (topics[t as string] || 0) + 1;
         if (Array.isArray(m.people))
@@ -314,6 +319,11 @@ server.registerTool(
         "Types:",
         ...sort(types).map(([k, v]) => `  ${k}: ${v}`),
       ];
+
+      if (Object.keys(sources).length) {
+        lines.push("", "By source:");
+        for (const [k, v] of sort(sources)) lines.push(`  ${k}: ${v}`);
+      }
 
       if (Object.keys(topics).length) {
         lines.push("", "Top topics:");
